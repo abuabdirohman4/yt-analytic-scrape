@@ -1,0 +1,130 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #0f0f0f;
+    color: #e8eaed;
+    min-width: 300px;
+}
+
+.popup-container {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.popup-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #3c3c3c;
+}
+
+.header-icon {
+    color: #ff0000;
+    font-size: 22px;
+}
+
+.popup-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e8eaed;
+}
+
+/* Status Message */
+.status-message {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #1e1e1e;
+    border-radius: 8px;
+    border: 1px solid #3c3c3c;
+    font-size: 12px;
+}
+
+.status-message .status-icon {
+    font-size: 16px;
+    color: #9aa0a6;
+}
+
+.status-message.running { border-color: #1a73e8; }
+.status-message.running .status-icon { color: #1a73e8; }
+.status-message.success { border-color: #34a853; }
+.status-message.success .status-icon { color: #34a853; }
+.status-message.error { border-color: #ea4335; }
+.status-message.error .status-icon { color: #ea4335; }
+
+/* Progress */
+.progress-container { display: flex; flex-direction: column; gap: 4px; }
+
+.progress {
+    height: 4px;
+    background: #3c3c3c;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background: #1a73e8;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.progress-label {
+    font-size: 11px;
+    color: #9aa0a6;
+    text-align: center;
+}
+
+/* Buttons */
+.action-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.start-btn, .stop-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.start-btn { background: #1a73e8; color: #fff; }
+.start-btn:hover:not(:disabled) { background: #1557b0; }
+.start-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.stop-btn { background: #ea4335; color: #fff; }
+.stop-btn:hover:not(:disabled) { background: #c5221f; }
+.stop-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.start-btn .material-icons-outlined,
+.stop-btn .material-icons-outlined {
+    font-size: 16px;
+}
+
+/* Settings hint */
+.settings-section { padding-top: 4px; }
+
+.settings-hint {
+    font-size: 11px;
+    color: #9aa0a6;
+    text-align: center;
+    line-height: 1.4;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}

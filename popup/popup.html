@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YT Analytics Scraper</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="popup-container">
+        <div class="popup-header">
+            <span class="header-icon">📊</span>
+            <h1 class="popup-title">YT Analytics Scraper</h1>
+        </div>
+
+        <div class="status-message" id="statusMessage">
+            <span class="status-icon">✓</span>
+            <span class="status-text">Ready to scrape</span>
+        </div>
+
+        <div class="progress-container" id="progressContainer" style="display:none;">
+            <div class="progress">
+                <div class="progress-bar" id="progressFill" role="progressbar" style="width: 0%"></div>
+            </div>
+            <div class="progress-label" id="progressLabel"></div>
+        </div>
+
+        <div class="action-buttons">
+            <button class="start-btn" id="startButton">▶ Start Scraping</button>
+            <button class="stop-btn" id="stopButton" disabled>■ Stop</button>
+        </div>
+
+        <div class="settings-section">
+            <p class="settings-hint">Open YouTube Studio → Content page before starting.</p>
+        </div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>
