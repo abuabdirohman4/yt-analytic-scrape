@@ -23,8 +23,7 @@ body {
 }
 
 .header-icon {
-    color: #ff0000;
-    font-size: 22px;
+    display: block;
 }
 
 .popup-title {

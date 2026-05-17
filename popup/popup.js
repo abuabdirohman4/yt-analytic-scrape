@@ -58,6 +58,25 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isScraping) hideProgress();
     };
 
+    const showProgressFromData = (data) => {
+        const { currentVideo, totalVideos, phase, videoTitle, etaSeconds } = data;
+        const pct = Math.round(((currentVideo - 1) / totalVideos) * 100);
+        const phaseLabel = phase === 'reach' ? 'Reach' : 'Overview';
+
+        let statusLabel = `Video ${currentVideo}/${totalVideos} — ${phaseLabel}`;
+        if (videoTitle) statusLabel += ': ' + videoTitle.substring(0, 25);
+
+        let etaLabel = '';
+        if (etaSeconds != null) {
+            const min = Math.floor(etaSeconds / 60);
+            const sec = etaSeconds % 60;
+            etaLabel = `~${min > 0 ? min + 'm ' : ''}${sec}s left`;
+        }
+
+        showProgress(pct, etaLabel);
+        updateStatusMessage(statusLabel, 'running');
+    };
+
     startButton.addEventListener('click', () => {
         updateUI(true, 'Starting...');
         chrome.runtime.sendMessage({ action: 'startScraping' }, (response) => {
@@ -75,24 +94,20 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.runtime.onMessage.addListener((request) => {
         if (request.action === 'updateStatus') {
             updateUI(request.isScraping, request.status);
-        }
-
-        else if (request.action === 'updateProgress') {
-            const { currentVideo, totalVideos, phase, videoTitle } = request;
-            const pct = Math.round(((currentVideo - 1) / totalVideos) * 100);
-            const phaseLabel = phase === 'reach' ? 'Reach' : 'Engagement';
-            const label = `Video ${currentVideo}/${totalVideos} — ${phaseLabel}${videoTitle ? ': ' + videoTitle.substring(0, 30) : ''}`;
-            showProgress(pct, label);
-            updateStatusMessage(label, 'running');
+        } else if (request.action === 'updateProgress') {
+            showProgressFromData(request);
         }
     });
 
-    // Load initial status
-    chrome.runtime.sendMessage({ action: 'getStatus' }, (response) => {
-        if (chrome.runtime.lastError || !response) {
+    // Load initial status + restore progress if popup reopened mid-scrape
+    chrome.storage.local.get(['isScraping', 'status', 'lastProgress'], (r) => {
+        if (chrome.runtime.lastError || !r) {
             updateUI(false, 'Ready to scrape');
             return;
         }
-        updateUI(response.isScraping, response.status || 'Ready to scrape');
+        updateUI(r.isScraping ?? false, r.status ?? 'Ready to scrape');
+        if (r.isScraping && r.lastProgress) {
+            showProgressFromData(r.lastProgress);
+        }
     });
 });

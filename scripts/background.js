@@ -7,40 +7,49 @@ const setScrapingState = async (isScraping, status) => {
     }
 };
 
-function injectAndSendCommand(command) {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const tab = tabs[0];
-        if (!tab || !tab.id) {
-            console.error('[Background] No active tab found.');
-            setScrapingState(false, 'Error: No active tab found.');
+function injectToTab(tabId, command) {
+    chrome.scripting.executeScript({
+        target: { tabId },
+        files: ['scripts/content.js']
+    }, () => {
+        if (chrome.runtime.lastError) {
+            console.error(`[Background] Injection failed: ${chrome.runtime.lastError.message}`);
+            setScrapingState(false, 'Injection failed.');
             return;
         }
-
-        chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            files: ['scripts/content.js']
-        }, () => {
-            if (chrome.runtime.lastError) {
-                console.error(`[Background] Injection failed: ${chrome.runtime.lastError.message}`);
-                setScrapingState(false, 'Injection failed.');
-                return;
-            }
-            chrome.tabs.sendMessage(tab.id, command);
-        });
+        chrome.tabs.sendMessage(tabId, command);
     });
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'startScraping') {
-        setScrapingState(true, 'Starting...');
-        chrome.storage.local.set({ scrapedData: [], scrapeQueue: [], currentVideoIndex: 0 });
-        injectAndSendCommand(request);
-        sendResponse({ success: true });
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            const tabId = tabs[0]?.id;
+            if (!tabId) {
+                setScrapingState(false, 'No active tab found.');
+                sendResponse({ success: false });
+                return;
+            }
+            chrome.storage.local.set({
+                scrapingTabId: tabId,
+                videoFinishTimes: [],
+                scrapedData: [],
+                scrapeQueue: [],
+                currentVideoIndex: 0,
+                lastProgress: null
+            });
+            setScrapingState(true, 'Starting...');
+            injectToTab(tabId, request);
+            sendResponse({ success: true });
+        });
+        return true;
     }
 
     else if (request.action === 'stopScraping') {
-        setScrapingState(false, 'Stopped.');
-        injectAndSendCommand({ action: 'stopScraping' });
+        chrome.storage.local.get(['scrapingTabId'], (r) => {
+            setScrapingState(false, 'Stopped.');
+            if (r.scrapingTabId) injectToTab(r.scrapingTabId, { action: 'stopScraping' });
+        });
         sendResponse({ success: true });
     }
 
@@ -55,12 +64,38 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     else if (request.action === 'updateProgress') {
-        chrome.runtime.sendMessage(request);
+        const { currentVideo, totalVideos, phase } = request;
+        chrome.storage.local.get(['videoFinishTimes'], (r) => {
+            const times = r.videoFinishTimes || [];
+
+            // Record timestamp only when a video is fully done (reach = last phase per video)
+            if (phase === 'reach') {
+                times.push(Date.now());
+                chrome.storage.local.set({ videoFinishTimes: times });
+            }
+
+            // ETA from average interval between completion timestamps
+            let etaSeconds = null;
+            if (times.length >= 2) {
+                const intervals = [];
+                for (let i = 1; i < times.length; i++) {
+                    intervals.push(times[i] - times[i - 1]);
+                }
+                const avgMs = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+                const videosLeft = totalVideos - currentVideo;
+                etaSeconds = Math.round(avgMs * videosLeft / 1000);
+            }
+
+            const progressData = { ...request, etaSeconds };
+            chrome.storage.local.set({ lastProgress: progressData });
+            chrome.runtime.sendMessage(progressData).catch(() => {});
+        });
     }
 
     else if (request.action === 'scrapingJobDone') {
         console.log('[Background] Scraping done. Generating CSV.');
         setScrapingState(false, 'Done!');
+        chrome.storage.local.set({ lastProgress: null });
         chrome.storage.local.get(['scrapedData'], (result) => {
             const data = result.scrapedData || [];
             if (data.length === 0) {
@@ -81,9 +116,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     else if (request.action === 'navigateTo') {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (tabs[0]) {
-                chrome.tabs.update(tabs[0].id, { url: request.url });
+        chrome.storage.local.get(['scrapingTabId'], (r) => {
+            if (r.scrapingTabId) {
+                chrome.tabs.update(r.scrapingTabId, { url: request.url });
             }
         });
         sendResponse({ success: true });
@@ -145,6 +180,8 @@ chrome.runtime.onInstalled.addListener(() => {
         status: 'Ready',
         scrapedData: [],
         scrapeQueue: [],
-        currentVideoIndex: 0
+        currentVideoIndex: 0,
+        videoFinishTimes: [],
+        lastProgress: null
     });
 });
