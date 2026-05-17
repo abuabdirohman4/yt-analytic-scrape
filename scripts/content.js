@@ -41,70 +41,42 @@ function getMetricByLabel(labelText) {
     return null;
 }
 
-// Scroll to bottom repeatedly until no new rows appear, to trigger lazy-loading
-async function scrollUntilAllLoaded() {
-    let prevCount = 0;
-    let stableRounds = 0;
-
-    while (stableRounds < 3) {
-        window.scrollTo(0, document.body.scrollHeight);
-        await new Promise(r => setTimeout(r, 1200));
-
-        const current = document.querySelectorAll('a#anchor-analytics').length;
-        if (current === prevCount) {
-            stableRounds++;
-        } else {
-            stableRounds = 0;
-            prevCount = current;
-        }
-    }
-
-    // Scroll back to top so the page looks normal
-    window.scrollTo(0, 0);
-    await new Promise(r => setTimeout(r, 300));
-}
-
 // ===================== SCRAPING FUNCTIONS =====================
 
 async function getVideoListFromPage() {
     console.log('[Content Script] Waiting for video list to render...');
     try {
-        await waitForElement('a#anchor-analytics', 15000);
+        await waitForElement('ytcp-video-row', 15000);
     } catch (e) {
         console.error('[Content Script] Timed out waiting for video list:', e.message);
         return [];
     }
+    // Small delay to let all rows finish rendering
+    await new Promise(r => setTimeout(r, 1000));
 
-    // Scroll to load all lazy-rendered rows
-    console.log('[Content Script] Scrolling to load all videos...');
-    await scrollUntilAllLoaded();
-
-    const analyticsLinks = document.querySelectorAll('a#anchor-analytics[href*="/analytics/tab-overview"]');
+    const rows = document.querySelectorAll('ytcp-video-row');
     const videos = [];
 
-    analyticsLinks.forEach(link => {
-        const hrefMatch = link.href.match(/\/video\/([^/]+)\/analytics/);
-        if (!hrefMatch) return;
-        const videoId = hrefMatch[1];
-
-        const row = link.closest('ytcp-video-row') || link.closest('[role="row"]');
-        if (!row) return;
-
-        // Only include Published videos — skip Scheduled, Draft, Private
-        // .cell-description is a sibling of .tablecell-visibility, not a child
+    rows.forEach(row => {
+        // Skip Scheduled, Draft, Private
         const visibilityEl = row.querySelector('.cell-description');
-        if (!visibilityEl || !visibilityEl.textContent.trim().includes('Published')) return;
-
-        let title = '';
-        let uploadDate = '';
-
-        const cellVideo = row.querySelector('ytcp-video-list-cell-video');
-        if (cellVideo) {
-            const titleEl = cellVideo.querySelector('#video-title') || cellVideo.querySelector('.video-title-wrapper');
-            if (titleEl) title = titleEl.textContent.trim();
+        if (visibilityEl) {
+            const vis = visibilityEl.textContent.trim().toLowerCase();
+            if (vis.includes('scheduled') || vis.includes('draft') || vis.includes('private')) return;
         }
+
+        // Extract video ID from any href containing /video/<id>/
+        const link = row.querySelector('a[href*="/video/"][href*="/edit"]');
+        if (!link) return;
+        const match = link.href.match(/\/video\/([^/]+)\//);
+        if (!match) return;
+        const videoId = match[1];
+
+        const titleEl = row.querySelector('#video-title');
+        const title = titleEl ? titleEl.textContent.trim() : '';
+
         const dateEl = row.querySelector('.tablecell-date');
-        if (dateEl) uploadDate = dateEl.textContent.trim().split('\n')[0].trim();
+        const uploadDate = dateEl ? dateEl.textContent.trim().split('\n')[0].trim() : '';
 
         videos.push({ videoId, title, uploadDate });
     });
@@ -130,15 +102,17 @@ async function scrapeReachTab() {
     let suggestedVideos = null;
     let browseFeatures = null;
 
-    const sourceCards = document.querySelectorAll('yta-video-traffic-source-card');
-    sourceCards.forEach(card => {
-        const titleEl = card.querySelector('.traffic-source-title');
-        const shareEl = card.querySelector('.share-value');
-        if (!titleEl || !shareEl) return;
+    // Traffic sources are in yta-table-card > tr.table-row rows.
+    // Each row has: .title-text.debug-dimension-value (source name) and .value.debug-table-value (percentage)
+    const tableRows = document.querySelectorAll('yta-table-card tr.table-row');
+    tableRows.forEach(row => {
+        const titleEl = row.querySelector('.title-text.debug-dimension-value');
+        const valueEl = row.querySelector('.value.debug-table-value');
+        if (!titleEl || !valueEl) return;
         const titleText = titleEl.textContent.trim().toLowerCase();
-        const shareText = shareEl.textContent.trim();
-        if (titleText.includes('suggested video')) suggestedVideos = shareText;
-        if (titleText.includes('browse feature')) browseFeatures = shareText;
+        const valueText = valueEl.textContent.trim();
+        if (titleText.includes('suggested video')) suggestedVideos = valueText;
+        if (titleText.includes('browse feature')) browseFeatures = valueText;
     });
 
     console.log('[Content Script] Reach data:', { impressions, ctr, views, suggestedVideos, browseFeatures });
