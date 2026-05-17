@@ -4,7 +4,7 @@ function getPageType() {
     const url = window.location.href;
     if (url.includes('/videos') && !url.includes('/analytics')) return 'channel-content';
     if (url.includes('/analytics/tab-reach')) return 'reach';
-    if (url.includes('/analytics/tab-engagement')) return 'engagement';
+    if (url.includes('/analytics/tab-interest_viewers')) return 'engagement';
     return 'other';
 }
 
@@ -243,7 +243,7 @@ async function continueScrapingOnCurrentPage(state) {
 
             chrome.runtime.sendMessage({
                 action: 'navigateTo',
-                url: `https://studio.youtube.com/video/${video.videoId}/analytics/tab-engagement/period-default`
+                url: `https://studio.youtube.com/video/${video.videoId}/analytics/tab-interest_viewers/period-default`
             });
 
         } else if (pageType === 'engagement') {
