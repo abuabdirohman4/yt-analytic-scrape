@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="161" height="110" viewBox="0 0 161 110" fill="none">
+<rect x="0.5" y="0.5" width="160" height="109" rx="2.5" fill="white"/>
+<rect opacity="0.5" x="1" y="1" width="159" height="108" fill="white"/>
+<rect x="1" y="1" width="159" height="7" fill="#C4C4C4"/>
+<path d="M13.1062 12.937C13.0074 12.568 12.7174 12.278 12.3484 12.1792C11.6803 12 8.99987 12 8.99987 12C8.99987 12 6.31948 12 5.65133 12.1792C5.28232 12.278 4.99234 12.568 4.89356 12.937C4.71435 13.6051 4.71436 15 4.71436 15C4.71436 15 4.71435 16.3949 4.89356 17.063C4.99234 17.432 5.28232 17.722 5.65133 17.8208C6.31948 18 8.99987 18 8.99987 18C8.99987 18 11.6803 18 12.3484 17.8208C12.7174 17.722 13.0074 17.432 13.1062 17.063C13.2854 16.3949 13.2854 15 13.2854 15C13.2854 15 13.2854 13.6051 13.1062 12.937Z" fill="#FF0000"/>
+<path d="M8.14258 16.2857L10.3693 15.0002L8.14258 13.7147V16.2857Z" fill="white"/>
+<circle cx="153" cy="15" r="3" fill="#C4C4C4"/>
+<circle cx="141" cy="15" r="3" fill="#C4C4C4"/>
+<circle cx="129" cy="15" r="3" fill="#C4C4C4"/>
+<circle cx="9" cy="26" r="3" fill="#C4C4C4"/>
+<circle cx="9" cy="38" r="3" fill="#C4C4C4"/>
+<circle cx="9" cy="55" r="3" fill="#C4C4C4"/>
+<circle cx="9" cy="67" r="3" fill="#C4C4C4"/>
+<circle cx="9" cy="79" r="3" fill="#C4C4C4"/>
+<circle cx="9" cy="91" r="3" fill="#C4C4C4"/>
+<line x1="6" y1="46.5" x2="12" y2="46.5" stroke="#C4C4C4"/>
+<rect x="23.5" y="12.5" width="89" height="5" rx="1.5" fill="white" stroke="#C4C4C4"/>
+<circle cx="25.5" cy="98.5" r="2.5" fill="#C4C4C4"/>
+<circle cx="126.5" cy="44.5" r="2.5" fill="#C4C4C4"/>
+<circle cx="126.5" cy="71.5" r="2.5" fill="#C4C4C4"/>
+<circle cx="126.5" cy="98.5" r="2.5" fill="#C4C4C4"/>
+<line x1="30" y1="97" x2="54" y2="97" stroke="#C4C4C4" stroke-width="2"/>
+<line x1="131" y1="43" x2="149" y2="43" stroke="#C4C4C4" stroke-width="2"/>
+<line x1="131" y1="70" x2="149" y2="70" stroke="#C4C4C4" stroke-width="2"/>
+<line x1="131" y1="97" x2="149" y2="97" stroke="#C4C4C4" stroke-width="2"/>
+<line x1="30" y1="100" x2="44" y2="100" stroke="#C4C4C4" stroke-width="2"/>
+<line x1="131" y1="46" x2="141" y2="46" stroke="#C4C4C4" stroke-width="2"/>
+<line x1="131" y1="73" x2="141" y2="73" stroke="#C4C4C4" stroke-width="2"/>
+<line x1="131" y1="100" x2="141" y2="100" stroke="#C4C4C4" stroke-width="2"/>
+<rect x="23" y="24" width="96" height="69" rx="2" fill="#C4C4C4"/>
+<rect x="124" y="24" width="27" height="15" rx="2" fill="#FF0000"/>
+<rect x="124" y="51" width="27" height="15" rx="2" fill="#FF0000"/>
+<rect x="124" y="78" width="27" height="15" rx="2" fill="#FF0000"/>
+<path d="M124 107C124 105.895 124.895 105 126 105H149C150.105 105 151 105.895 151 107V109H124V107Z" fill="#FF0000"/>
+<rect x="0.5" y="0.5" width="160" height="109" rx="2.5" stroke="#E0E0E0"/>
+</svg>

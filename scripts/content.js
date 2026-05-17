@@ -4,7 +4,7 @@ function getPageType() {
     const url = window.location.href;
     if (url.includes('/videos') && !url.includes('/analytics')) return 'channel-content';
     if (url.includes('/analytics/tab-reach')) return 'reach';
-    if (url.includes('/analytics/tab-interest_viewers')) return 'engagement';
+    if (url.includes('/analytics/tab-overview')) return 'overview';
     return 'other';
 }
 
@@ -41,6 +41,53 @@ function getMetricByLabel(labelText) {
     return null;
 }
 
+// Convert "7.8k" → 7800, "2.2m" → 2200000, "733" → 733, "7.5%" → "7.5%"
+function parseNumber(val) {
+    if (!val) return '';
+    const s = val.trim();
+    if (s.endsWith('%')) return s; // keep percentages as-is
+    const lower = s.toLowerCase();
+    const num = parseFloat(lower);
+    if (isNaN(num)) return s;
+    if (lower.endsWith('k')) return Math.round(num * 1000);
+    if (lower.endsWith('m')) return Math.round(num * 1000000);
+    return num;
+}
+
+// Convert duration string to HH:MM:SS or MM:SS format, stripping milliseconds.
+// Handles "35.11.00" (dots) or "35:11:00" (colons) or "04.05" etc.
+function formatDuration(val) {
+    if (!val) return '';
+    // Normalize: replace dots with colons
+    const normalized = val.trim().replace(/\./g, ':');
+    // Split into parts
+    const parts = normalized.split(':').map(p => p.trim());
+    // Drop trailing milliseconds segment if it exists (e.g. "35:11:00" → keep as-is since it's HH:MM:SS)
+    // YouTube duration is at most HH:MM:SS — if 3 parts assume H:M:S, if 2 assume M:S
+    if (parts.length >= 3) {
+        // HH:MM:SS — strip any 4th part
+        return parts.slice(0, 3).join(':');
+    }
+    return parts.join(':');
+}
+
+// Calculate days between upload date string (e.g. "04 May 2026") and today
+function calcVideoAgeDays(uploadDateStr) {
+    if (!uploadDateStr) return '';
+    const uploaded = new Date(uploadDateStr);
+    if (isNaN(uploaded.getTime())) return '';
+    const today = new Date();
+    const diffMs = today - uploaded;
+    return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+}
+
+// Parse "63.6%" → 63.6 (as number), for summing percentages
+function parsePercent(val) {
+    if (!val) return null;
+    const match = val.trim().match(/^([\d.]+)%$/);
+    return match ? parseFloat(match[1]) : null;
+}
+
 // ===================== SCRAPING FUNCTIONS =====================
 
 async function getVideoListFromPage() {
@@ -51,7 +98,6 @@ async function getVideoListFromPage() {
         console.error('[Content Script] Timed out waiting for video list:', e.message);
         return [];
     }
-    // Small delay to let all rows finish rendering
     await new Promise(r => setTimeout(r, 1000));
 
     const rows = document.querySelectorAll('ytcp-video-row');
@@ -65,7 +111,7 @@ async function getVideoListFromPage() {
             if (vis.includes('scheduled') || vis.includes('draft') || vis.includes('private')) return;
         }
 
-        // Extract video ID from any href containing /video/<id>/
+        // Extract video ID from href /video/<id>/edit
         const link = row.querySelector('a[href*="/video/"][href*="/edit"]');
         if (!link) return;
         const match = link.href.match(/\/video\/([^/]+)\//);
@@ -78,8 +124,15 @@ async function getVideoListFromPage() {
         const dateEl = row.querySelector('.tablecell-date');
         const uploadDate = dateEl ? dateEl.textContent.trim().split('\n')[0].trim() : '';
 
-        videos.push({ videoId, title, uploadDate });
+        // Video duration from thumbnail timestamp label
+        const durationEl = row.querySelector('ytcp-thumbnail .label');
+        const videoDuration = formatDuration(durationEl ? durationEl.textContent.trim() : '');
+
+        videos.push({ videoId, title, uploadDate, videoDuration });
     });
+
+    // Sort oldest to newest
+    videos.sort((a, b) => new Date(a.uploadDate) - new Date(b.uploadDate));
 
     console.log(`[Content Script] Found ${videos.length} published videos:`, videos);
     return videos;
@@ -95,43 +148,88 @@ async function scrapeReachTab() {
     }
     await new Promise(r => setTimeout(r, 1500));
 
-    const impressions = getMetricByLabel('Impressions');
+    const impressions = parseNumber(getMetricByLabel('Impressions'));
     const ctr = getMetricByLabel('click-through rate');
-    const views = getMetricByLabel('Views');
+    const views = parseNumber(getMetricByLabel('Views'));
 
     let suggestedVideos = null;
     let browseFeatures = null;
 
-    // Traffic sources are in yta-table-card > tr.table-row rows.
-    // Each row has: .title-text.debug-dimension-value (source name) and .value.debug-table-value (percentage)
-    const tableRows = document.querySelectorAll('yta-table-card tr.table-row');
-    tableRows.forEach(row => {
-        const titleEl = row.querySelector('.title-text.debug-dimension-value');
-        const valueEl = row.querySelector('.value.debug-table-value');
-        if (!titleEl || !valueEl) return;
+    // Traffic sources: yta-video-traffic-source-card with .traffic-source-title + .share-value
+    const sourceCards = document.querySelectorAll('yta-video-traffic-source-card .traffic-row-container');
+    sourceCards.forEach(card => {
+        const titleEl = card.querySelector('.traffic-source-title');
+        const shareEl = card.querySelector('.share-value');
+        if (!titleEl || !shareEl) return;
         const titleText = titleEl.textContent.trim().toLowerCase();
-        const valueText = valueEl.textContent.trim();
-        if (titleText.includes('suggested video')) suggestedVideos = valueText;
-        if (titleText.includes('browse feature')) browseFeatures = valueText;
+        const shareText = shareEl.textContent.trim();
+        if (titleText.includes('suggested video')) suggestedVideos = shareText;
+        if (titleText.includes('browse feature')) browseFeatures = shareText;
     });
 
-    console.log('[Content Script] Reach data:', { impressions, ctr, views, suggestedVideos, browseFeatures });
-    return { impressions, ctr, views, suggestedVideos, browseFeatures };
+    // Fallback: yta-table-card rows (custom reach page variant)
+    if (!suggestedVideos && !browseFeatures) {
+        const tableRows = document.querySelectorAll('yta-table-card tr.table-row');
+        tableRows.forEach(row => {
+            const titleEl = row.querySelector('.title-text.debug-dimension-value');
+            const valueEl = row.querySelector('.value.debug-table-value');
+            if (!titleEl || !valueEl) return;
+            const titleText = titleEl.textContent.trim().toLowerCase();
+            const valueText = valueEl.textContent.trim();
+            if (titleText.includes('suggested video')) suggestedVideos = valueText;
+            if (titleText.includes('browse feature')) browseFeatures = valueText;
+        });
+    }
+
+    // Sum suggested + browse into one field
+    const sP = parsePercent(suggestedVideos);
+    const bP = parsePercent(browseFeatures);
+    const suggestedPlusBrowse = (sP !== null && bP !== null)
+        ? (sP + bP).toFixed(1) + '%'
+        : (sP !== null ? suggestedVideos : (bP !== null ? browseFeatures : null));
+
+    console.log('[Content Script] Reach data:', { impressions, ctr, views, suggestedPlusBrowse });
+    return { impressions, ctr, views, suggestedPlusBrowse };
 }
 
-async function scrapeEngagementTab() {
-    console.log('[Content Script] Scraping Engagement tab...');
+async function scrapeOverviewTab() {
+    console.log('[Content Script] Scraping Overview tab...');
     try {
-        await waitForElement('yta-key-metric-block');
+        await waitForElement('yta-audience-retention-highlights-video-card-v2');
     } catch (e) {
-        console.warn('[Content Script] Engagement tab: no metric blocks found, skipping.');
-        return null;
+        console.warn('[Content Script] Overview tab: retention card not found, trying key-metric-block...');
     }
     await new Promise(r => setTimeout(r, 1500));
 
-    const avgViewDuration = getMetricByLabel('Average view duration');
-    console.log('[Content Script] Engagement data:', { avgViewDuration });
-    return { avgViewDuration };
+    // Average view duration and Average percentage viewed from retention card
+    let avgViewDuration = null;
+    let avgPctViewed = null;
+
+    const retentionRows = document.querySelectorAll('yta-audience-retention-highlights-video-card-v2 .metric-row');
+    retentionRows.forEach(row => {
+        const divs = row.querySelectorAll('div');
+        if (divs.length < 2) return;
+        const label = divs[0].textContent.trim().toLowerCase();
+        const value = divs[1].textContent.trim();
+        if (label.includes('average view duration')) avgViewDuration = value;
+        if (label.includes('average percentage viewed')) avgPctViewed = value;
+    });
+
+    // YouTube recommendations % — commented out, not needed currently
+    // let ytRecommendations = null;
+    // const sourceCards = document.querySelectorAll('yta-video-traffic-source-card .traffic-row-container');
+    // sourceCards.forEach(card => {
+    //     const titleEl = card.querySelector('.traffic-source-title');
+    //     const shareEl = card.querySelector('.share-value');
+    //     if (!titleEl || !shareEl) return;
+    //     const titleText = titleEl.textContent.trim().toLowerCase();
+    //     if (titleText.includes('youtube recommendation') || titleText.includes('recommended')) {
+    //         ytRecommendations = shareEl.textContent.trim();
+    //     }
+    // });
+
+    console.log('[Content Script] Overview data:', { avgViewDuration, avgPctViewed });
+    return { avgViewDuration: formatDuration(avgViewDuration), avgPctViewed };
 }
 
 // ===================== MAIN AUTOMATION =====================
@@ -153,12 +251,12 @@ async function runScraping() {
         return;
     }
 
-    await chrome.storage.local.set({ scrapeQueue: videos, scrapedData: [], currentVideoIndex: 0, scrapePhase: 'reach' });
+    await chrome.storage.local.set({ scrapeQueue: videos, scrapedData: [], currentVideoIndex: 0, scrapePhase: 'overview' });
 
     const firstVideo = videos[0];
     chrome.runtime.sendMessage({
         action: 'navigateTo',
-        url: `https://studio.youtube.com/video/${firstVideo.videoId}/analytics/tab-reach_viewers/period-default`
+        url: `https://studio.youtube.com/video/${firstVideo.videoId}/analytics/tab-overview/period-default`
     });
 }
 
@@ -197,39 +295,40 @@ async function continueScrapingOnCurrentPage(state) {
             const nextVideo = scrapeQueue[nextIndex];
             chrome.runtime.sendMessage({
                 action: 'navigateTo',
-                url: `https://studio.youtube.com/video/${nextVideo.videoId}/analytics/tab-reach_viewers/period-default`
+                url: `https://studio.youtube.com/video/${nextVideo.videoId}/analytics/tab-overview/period-default`
             });
         }
     };
 
     try {
-        if (pageType === 'reach') {
-            const reachData = await scrapeReachTab();
+        if (pageType === 'overview') {
+            const overviewData = await scrapeOverviewTab();
             const result = await chrome.storage.local.get(['scrapedData']);
             const scrapedData = result.scrapedData || [];
             scrapedData[currentVideoIndex] = {
                 videoId: video.videoId,
                 title: video.title,
                 uploadDate: video.uploadDate,
-                ...(reachData || {})
+                videoDuration: video.videoDuration,
+                ...(overviewData || {})
             };
-            await chrome.storage.local.set({ scrapedData, scrapePhase: 'engagement' });
+            await chrome.storage.local.set({ scrapedData, scrapePhase: 'reach' });
 
             chrome.runtime.sendMessage({
                 action: 'navigateTo',
-                url: `https://studio.youtube.com/video/${video.videoId}/analytics/tab-interest_viewers/period-default`
+                url: `https://studio.youtube.com/video/${video.videoId}/analytics/tab-reach_viewers/period-default`
             });
 
-        } else if (pageType === 'engagement') {
-            const engagementData = await scrapeEngagementTab();
+        } else if (pageType === 'reach') {
+            const reachData = await scrapeReachTab();
             const result = await chrome.storage.local.get(['scrapedData']);
             const scrapedData = result.scrapedData || [];
             if (scrapedData[currentVideoIndex]) {
-                scrapedData[currentVideoIndex] = { ...scrapedData[currentVideoIndex], ...(engagementData || {}) };
+                scrapedData[currentVideoIndex] = { ...scrapedData[currentVideoIndex], ...(reachData || {}) };
             }
 
             const nextIndex = currentVideoIndex + 1;
-            await chrome.storage.local.set({ scrapedData, currentVideoIndex: nextIndex, scrapePhase: 'reach' });
+            await chrome.storage.local.set({ scrapedData, currentVideoIndex: nextIndex, scrapePhase: 'overview' });
             await navigateToNext(nextIndex);
 
         } else {
@@ -238,7 +337,6 @@ async function continueScrapingOnCurrentPage(state) {
         }
     } catch (err) {
         console.error('[Content Script] Error during scraping:', err);
-        // On unexpected error, skip to next video instead of stopping entirely
         const nextIndex = currentVideoIndex + 1;
         const result = await chrome.storage.local.get(['scrapedData']);
         const scrapedData = result.scrapedData || [];
@@ -271,7 +369,7 @@ if (!window.ytScraperLoaded) {
     // Auto-continue when navigated to an analytics page mid-scrape
     chrome.storage.local.get(['isScraping', 'scrapePhase', 'scrapeQueue', 'currentVideoIndex'], (state) => {
         const pageType = getPageType();
-        if (state.isScraping && (pageType === 'reach' || pageType === 'engagement')) {
+        if (state.isScraping && (pageType === 'overview' || pageType === 'reach')) {
             console.log('[Content Script] Resuming scraping on page load. Phase:', pageType);
             continueScrapingOnCurrentPage(state);
         }

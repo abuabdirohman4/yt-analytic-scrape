@@ -94,15 +94,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 function generateCSV(data) {
     const headers = [
-        'Video ID',
-        'Title',
         'Upload Date',
+        'Video Age (Day)',
         'Impressions',
         'CTR',
         'Views',
-        'Suggested Videos %',
-        'Browse Features %',
-        'Avg View Duration'
+        'Suggested + Browse',
+        'Video Duration',
+        'Avg View Duration',
+        'Avg % Viewed'
     ];
 
     const escapeCSV = (val) => {
@@ -114,17 +114,24 @@ function generateCSV(data) {
         return str;
     };
 
+    const calcAgeDays = (uploadDateStr) => {
+        if (!uploadDateStr) return '';
+        const uploaded = new Date(uploadDateStr);
+        if (isNaN(uploaded.getTime())) return '';
+        return Math.floor((Date.now() - uploaded.getTime()) / (1000 * 60 * 60 * 24));
+    };
+
     const rows = data.map(row => headers.map(h => {
+        if (h === 'Video Age (Day)') return escapeCSV(calcAgeDays(row.uploadDate));
         const keyMap = {
-            'Video ID': 'videoId',
-            'Title': 'title',
             'Upload Date': 'uploadDate',
             'Impressions': 'impressions',
             'CTR': 'ctr',
             'Views': 'views',
-            'Suggested Videos %': 'suggestedVideos',
-            'Browse Features %': 'browseFeatures',
-            'Avg View Duration': 'avgViewDuration'
+            'Suggested + Browse': 'suggestedPlusBrowse',
+            'Video Duration': 'videoDuration',
+            'Avg View Duration': 'avgViewDuration',
+            'Avg % Viewed': 'avgPctViewed'
         };
         return escapeCSV(row[keyMap[h]]);
     }).join(','));
