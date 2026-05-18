@@ -1,96 +1,132 @@
 document.addEventListener('DOMContentLoaded', () => {
     const startButton = document.getElementById('startButton');
     const stopButton = document.getElementById('stopButton');
-    const statusMessage = document.getElementById('statusMessage');
-    const progressContainer = document.getElementById('progressContainer');
+    const statusCardWrap = document.getElementById('statusCardWrap');
+    const progressCardWrap = document.getElementById('progressCardWrap');
+    const statusCard = document.getElementById('statusCard');
+    const statusIconCircle = document.getElementById('statusIconCircle');
+    const statusIconSvg = document.getElementById('statusIconSvg');
+    const statusDot = document.getElementById('statusDot');
+    const statusLabel = document.getElementById('statusLabel');
+    const statusSub = document.getElementById('statusSub');
+    const progressCount = document.getElementById('progressCount');
+    const progressTitle = document.getElementById('progressTitle');
     const progressFill = document.getElementById('progressFill');
-    const progressLabel = document.getElementById('progressLabel');
+    const etaPill = document.getElementById('etaPill');
+    const etaEstimating = document.getElementById('etaEstimating');
+    const themeToggle = document.getElementById('themeToggle');
 
-    const updateStatusMessage = (message, type = 'default') => {
-        const icon = statusMessage.querySelector('.status-icon');
-        const text = statusMessage.querySelector('.status-text');
-        statusMessage.className = 'status-message';
-
-        switch (type) {
-            case 'running':
-                icon.textContent = '↻';
-                icon.style.animation = 'spin 1s linear infinite';
-                statusMessage.classList.add('running');
-                break;
-            case 'success':
-                icon.textContent = '✓';
-                icon.style.animation = '';
-                statusMessage.classList.add('success');
-                break;
-            case 'error':
-                icon.textContent = '✕';
-                icon.style.animation = '';
-                statusMessage.classList.add('error');
-                break;
-            default:
-                icon.textContent = '✓';
-                icon.style.animation = '';
-        }
-        text.textContent = message;
+    // ── Icons ──
+    const ICONS = {
+        check: '<path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z" fill="currentColor"/>',
+        play:  '<path d="M8 5v14l11-7L8 5Z" fill="currentColor"/>',
+        error: '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z" fill="currentColor"/>',
     };
 
-    const showProgress = (pct, label) => {
-        progressContainer.style.display = 'flex';
-        progressFill.style.width = `${pct}%`;
-        progressLabel.textContent = label || '';
-    };
+    // ── Theme ──
+    chrome.storage.local.get(['theme'], (r) => {
+        const theme = r.theme || 'dark';
+        applyTheme(theme);
+    });
 
-    const hideProgress = () => {
-        progressContainer.style.display = 'none';
-        progressFill.style.width = '0%';
-    };
+    themeToggle.addEventListener('click', () => {
+        const current = document.body.getAttribute('data-theme');
+        const next = current === 'dark' ? 'light' : 'dark';
+        applyTheme(next);
+        chrome.storage.local.set({ theme: next });
+    });
 
-    const updateUI = (isScraping, status) => {
+    function applyTheme(theme) {
+        document.body.setAttribute('data-theme', theme);
+        themeToggle.textContent = theme === 'dark' ? '☀' : '🌙';
+    }
+
+    // ── Status card helpers ──
+    function showStatusCard(label, sub, iconName, dotColor) {
+        statusCardWrap.style.display = '';
+        progressCardWrap.style.display = 'none';
+
+        statusLabel.textContent = label;
+        statusSub.textContent = sub;
+        statusIconSvg.innerHTML = ICONS[iconName] || ICONS.check;
+
+        statusIconCircle.className = 'status-icon-circle';
+        statusDot.style.background = dotColor;
+        statusCard.querySelector('svg').style.color = dotColor;
+    }
+
+    function showProgressCard() {
+        statusCardWrap.style.display = 'none';
+        progressCardWrap.style.display = '';
+    }
+
+    // ── UI state ──
+    function updateUI(isScraping, status) {
         startButton.disabled = isScraping;
         stopButton.disabled = !isScraping;
-        if (status) {
-            const type = isScraping ? 'running'
-                : status.toLowerCase().includes('done') || status.toLowerCase().includes('ready') ? 'success'
-                : status.toLowerCase().includes('error') || status.toLowerCase().includes('fail') ? 'error'
-                : 'default';
-            updateStatusMessage(status, type);
-        }
-        if (!isScraping) hideProgress();
-    };
 
-    const showProgressFromData = (data) => {
+        if (isScraping) return; // progress card handles the display
+
+        const s = (status || '').toLowerCase();
+        if (s.includes('done')) {
+            showStatusCard('Scrape complete', 'CSV downloaded successfully', 'check', '#16a34a');
+        } else if (s.includes('error') || s.includes('fail') || s.includes('injection')) {
+            showStatusCard(status, 'Check the console for details', 'error', '#f59e0b');
+        } else if (s.includes('stop')) {
+            showStatusCard('Stopped', 'Click Start to begin a new scrape', 'check', '#606060');
+        } else {
+            showStatusCard('Ready to scrape', 'Open Content page in Studio', 'check', '#16a34a');
+        }
+    }
+
+    // ── Progress card helpers ──
+    function showProgressFromData(data) {
         const { currentVideo, totalVideos, phase, videoTitle, etaSeconds } = data;
-        const pct = Math.round(((currentVideo - 1) / totalVideos) * 100);
+        showProgressCard();
+
+        const pct = Math.max(2, Math.round((currentVideo / totalVideos) * 100));
         const phaseLabel = phase === 'reach' ? 'Reach' : 'Overview';
 
-        let statusLabel = `Video ${currentVideo}/${totalVideos} — ${phaseLabel}`;
-        if (videoTitle) statusLabel += ': ' + videoTitle.substring(0, 25);
+        progressCount.textContent = `Video ${currentVideo}/${totalVideos}`;
+        progressTitle.textContent = `${phaseLabel}: ${videoTitle || ''}`;
+        progressFill.style.width = `${pct}%`;
 
-        let etaLabel = '';
         if (etaSeconds != null) {
             const min = Math.floor(etaSeconds / 60);
             const sec = etaSeconds % 60;
-            etaLabel = `~${min > 0 ? min + 'm ' : ''}${sec}s left`;
+            etaPill.textContent = `~${min > 0 ? min + 'm ' : ''}${sec}s left`;
+            etaPill.style.display = '';
+            etaEstimating.style.display = 'none';
+        } else {
+            etaPill.style.display = 'none';
+            etaEstimating.style.display = '';
         }
+    }
 
-        showProgress(pct, etaLabel);
-        updateStatusMessage(statusLabel, 'running');
-    };
-
+    // ── Buttons ──
     startButton.addEventListener('click', () => {
-        updateUI(true, 'Starting...');
+        startButton.disabled = true;
+        stopButton.disabled = false;
+        showProgressCard();
+        progressCount.textContent = 'Video 1/…';
+        progressTitle.textContent = 'Starting…';
+        progressFill.style.width = '0%';
+        etaPill.style.display = 'none';
+        etaEstimating.style.display = '';
+
         chrome.runtime.sendMessage({ action: 'startScraping' }, (response) => {
             if (chrome.runtime.lastError) {
-                updateUI(false, 'Failed to start');
+                updateUI(false, 'Error: Failed to start');
             }
         });
     });
 
     stopButton.addEventListener('click', () => {
-        updateUI(false, 'Stopping...');
+        stopButton.disabled = true;
         chrome.runtime.sendMessage({ action: 'stopScraping' });
     });
 
+    // ── Live message listener ──
     chrome.runtime.onMessage.addListener((request) => {
         if (request.action === 'updateStatus') {
             updateUI(request.isScraping, request.status);
@@ -99,15 +135,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Load initial status + restore progress if popup reopened mid-scrape
+    // ── Initial load — restore state ──
     chrome.storage.local.get(['isScraping', 'status', 'lastProgress'], (r) => {
         if (chrome.runtime.lastError || !r) {
-            updateUI(false, 'Ready to scrape');
+            updateUI(false, 'Ready');
             return;
         }
-        updateUI(r.isScraping ?? false, r.status ?? 'Ready to scrape');
         if (r.isScraping && r.lastProgress) {
+            startButton.disabled = true;
+            stopButton.disabled = false;
             showProgressFromData(r.lastProgress);
+        } else {
+            updateUI(r.isScraping ?? false, r.status ?? 'Ready');
         }
     });
 });
