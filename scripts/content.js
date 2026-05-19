@@ -3,6 +3,7 @@
 function getPageType() {
     const url = window.location.href;
     if (url.includes('/videos') && !url.includes('/analytics')) return 'channel-content';
+    if (url.includes('/analytics/tab-reach') && /period-\d+,\d+/.test(url)) return 'reach48h';
     if (url.includes('/analytics/tab-reach')) return 'reach';
     if (url.includes('/analytics/tab-overview')) return 'overview';
     return 'other';
@@ -136,6 +137,24 @@ async function getVideoListFromPage() {
 
     console.log(`[Content Script] Found ${videos.length} published videos:`, videos);
     return videos;
+}
+
+function buildFirst2DaysUrl(videoId) {
+    return `https://studio.youtube.com/video/${videoId}/analytics/tab-reach_viewers/period-since_publish,time_period_unit_nth_days,2`;
+}
+
+async function scrapeReach48hTab() {
+    console.log('[Content Script] Scraping Reach 2-days tab...');
+    try {
+        await waitForElement('yta-key-metric-block');
+    } catch (e) {
+        console.warn('[Content Script] Reach 2-days tab: no metric blocks found, skipping.');
+        return null;
+    }
+    await new Promise(r => setTimeout(r, 1500));
+    const impressions48h = parseNumber(getMetricByLabel('Impressions'));
+    console.log('[Content Script] Reach 2-days data:', { impressions48h });
+    return { impressions48h };
 }
 
 async function scrapeReachTab() {
@@ -312,6 +331,27 @@ async function continueScrapingOnCurrentPage(state) {
                 videoDuration: video.videoDuration,
                 ...(overviewData || {})
             };
+            await chrome.storage.local.set({ scrapedData, scrapePhase: 'reach48h' });
+
+            const url48h = buildFirst2DaysUrl(video.videoId);
+            if (url48h) {
+                chrome.runtime.sendMessage({ action: 'navigateTo', url: url48h });
+            } else {
+                // No valid date — skip reach48h, go straight to reach
+                await chrome.storage.local.set({ scrapePhase: 'reach' });
+                chrome.runtime.sendMessage({
+                    action: 'navigateTo',
+                    url: `https://studio.youtube.com/video/${video.videoId}/analytics/tab-reach_viewers/period-default`
+                });
+            }
+
+        } else if (pageType === 'reach48h') {
+            const reach48hData = await scrapeReach48hTab();
+            const result = await chrome.storage.local.get(['scrapedData']);
+            const scrapedData = result.scrapedData || [];
+            if (scrapedData[currentVideoIndex]) {
+                scrapedData[currentVideoIndex] = { ...scrapedData[currentVideoIndex], ...(reach48hData || {}) };
+            }
             await chrome.storage.local.set({ scrapedData, scrapePhase: 'reach' });
 
             chrome.runtime.sendMessage({
@@ -340,7 +380,7 @@ async function continueScrapingOnCurrentPage(state) {
         const nextIndex = currentVideoIndex + 1;
         const result = await chrome.storage.local.get(['scrapedData']);
         const scrapedData = result.scrapedData || [];
-        await chrome.storage.local.set({ scrapedData, currentVideoIndex: nextIndex, scrapePhase: 'reach' });
+        await chrome.storage.local.set({ scrapedData, currentVideoIndex: nextIndex, scrapePhase: 'overview' });
         await navigateToNext(nextIndex);
     }
 }
@@ -369,7 +409,7 @@ if (!window.ytScraperLoaded) {
     // Auto-continue when navigated to an analytics page mid-scrape
     chrome.storage.local.get(['isScraping', 'scrapePhase', 'scrapeQueue', 'currentVideoIndex'], (state) => {
         const pageType = getPageType();
-        if (state.isScraping && (pageType === 'overview' || pageType === 'reach')) {
+        if (state.isScraping && (pageType === 'overview' || pageType === 'reach48h' || pageType === 'reach')) {
             console.log('[Content Script] Resuming scraping on page load. Phase:', pageType);
             continueScrapingOnCurrentPage(state);
         }

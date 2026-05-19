@@ -131,6 +131,7 @@ function generateCSV(data) {
     const headers = [
         'Upload Date',
         'Video Age (Day)',
+        'Impressions (2 Days)',
         'Impressions',
         'CTR',
         'Views',
@@ -160,6 +161,7 @@ function generateCSV(data) {
         if (h === 'Video Age (Day)') return escapeCSV(calcAgeDays(row.uploadDate));
         const keyMap = {
             'Upload Date': 'uploadDate',
+            'Impressions (2 Days)': 'impressions48h',
             'Impressions': 'impressions',
             'CTR': 'ctr',
             'Views': 'views',
