@@ -1,0 +1,11 @@
+{
+  "projectName": "YT Studio Analytics Scraper",
+  "projectDescription": "Chrome extension to scrape YouTube Studio analytics and export to CSV or Excel",
+  "versionFile": "manifest.json",
+  "artifacts": {
+    "changelog": "CHANGELOG.md",
+    "features": "docs/features.md",
+    "social": null
+  },
+  "language": "en"
+}
