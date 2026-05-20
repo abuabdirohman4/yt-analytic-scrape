@@ -5,6 +5,7 @@
   "artifacts": {
     "changelog": "CHANGELOG.md",
     "features": "docs/features.md",
+    "readme": "README.md",
     "social": null
   },
   "language": "en"
