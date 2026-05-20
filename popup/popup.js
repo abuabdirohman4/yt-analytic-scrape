@@ -15,6 +15,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const etaPill = document.getElementById('etaPill');
     const etaEstimating = document.getElementById('etaEstimating');
     const themeToggle = document.getElementById('themeToggle');
+    const settingsWrap = document.getElementById('settingsWrap');
+    const filterCountRow = document.getElementById('filterCountRow');
+    const filterDateRow = document.getElementById('filterDateRow');
+    const filterDirection = document.getElementById('filterDirection');
+    const filterCount = document.getElementById('filterCount');
+    const filterFrom = document.getElementById('filterFrom');
+    const filterTo = document.getElementById('filterTo');
 
     // ── Icons ──
     const ICONS = {
@@ -22,6 +29,38 @@ document.addEventListener('DOMContentLoaded', () => {
         play:  '<path d="M8 5v14l11-7L8 5Z" fill="currentColor"/>',
         error: '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z" fill="currentColor"/>',
     };
+
+    // ── Filter ──
+    function updateFilterUI(mode) {
+        filterCountRow.style.display = mode === 'count' ? '' : 'none';
+        filterDateRow.style.display = mode === 'date' ? '' : 'none';
+    }
+
+    function readFilterFromUI() {
+        const mode = document.querySelector('input[name="filterMode"]:checked')?.value || 'all';
+        if (mode === 'count') return { mode, direction: filterDirection.value, count: filterCount.value };
+        if (mode === 'date') return { mode, from: filterFrom.value, to: filterTo.value };
+        return { mode: 'all' };
+    }
+
+    function saveFilter() {
+        chrome.storage.local.set({ scrapeFilter: readFilterFromUI() });
+    }
+
+    document.querySelectorAll('input[name="filterMode"]').forEach(radio => {
+        radio.addEventListener('change', () => { updateFilterUI(radio.value); saveFilter(); });
+    });
+    filterDirection.addEventListener('change', saveFilter);
+    filterCount.addEventListener('input', saveFilter);
+    filterFrom.addEventListener('change', saveFilter);
+    filterTo.addEventListener('change', saveFilter);
+
+    // ── Export format ──
+    document.querySelectorAll('input[name="exportFormat"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            chrome.storage.local.set({ exportFormat: radio.value });
+        });
+    });
 
     // ── Theme ──
     chrome.storage.local.get(['theme'], (r) => {
@@ -45,6 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function showStatusCard(label, sub, iconName, dotColor) {
         statusCardWrap.style.display = '';
         progressCardWrap.style.display = 'none';
+        showSettingsWrap();
 
         statusLabel.textContent = label;
         statusSub.textContent = sub;
@@ -58,6 +98,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function showProgressCard() {
         statusCardWrap.style.display = 'none';
         progressCardWrap.style.display = '';
+        settingsWrap.style.display = 'none';
+    }
+
+    function showSettingsWrap() {
+        settingsWrap.style.display = '';
     }
 
     // ── UI state ──
@@ -133,6 +178,25 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (request.action === 'updateProgress') {
             showProgressFromData(request);
         }
+    });
+
+    // ── Initial load — restore filter & export settings ──
+    chrome.storage.local.get(['scrapeFilter', 'exportFormat'], (r) => {
+        const filter = r.scrapeFilter || { mode: 'all' };
+        const modeRadio = document.querySelector(`input[name="filterMode"][value="${filter.mode}"]`);
+        if (modeRadio) modeRadio.checked = true;
+        if (filter.mode === 'count') {
+            if (filter.direction) filterDirection.value = filter.direction;
+            if (filter.count) filterCount.value = filter.count;
+        } else if (filter.mode === 'date') {
+            if (filter.from) filterFrom.value = filter.from;
+            if (filter.to) filterTo.value = filter.to;
+        }
+        updateFilterUI(filter.mode);
+
+        const fmt = r.exportFormat || 'csv';
+        const fmtRadio = document.querySelector(`input[name="exportFormat"][value="${fmt}"]`);
+        if (fmtRadio) fmtRadio.checked = true;
     });
 
     // ── Initial load — restore state ──

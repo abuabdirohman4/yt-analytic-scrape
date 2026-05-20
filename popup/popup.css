@@ -269,6 +269,113 @@ body {
     transition: width 400ms ease;
 }
 
+/* ── Settings ── */
+.settings-wrap {
+    padding: 4px 16px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.settings-label {
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+    min-width: 42px;
+}
+
+.settings-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 2px 0;
+}
+
+.radio-group {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--color);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.radio-label input[type="radio"] {
+    accent-color: #cc0000;
+    cursor: pointer;
+}
+
+.filter-sub {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-left: 50px;
+}
+
+.setting-select {
+    height: 26px;
+    border-radius: 6px;
+    border: 1px solid var(--card-border);
+    background: var(--card-bg);
+    color: var(--color);
+    font-size: 12px;
+    font-family: inherit;
+    padding: 0 6px;
+    outline: none;
+    cursor: pointer;
+}
+
+.setting-number {
+    height: 26px;
+    width: 56px;
+    border-radius: 6px;
+    border: 1px solid var(--card-border);
+    background: var(--card-bg);
+    color: var(--color);
+    font-size: 12px;
+    font-family: inherit;
+    padding: 0 8px;
+    outline: none;
+    text-align: center;
+}
+
+.setting-date {
+    height: 26px;
+    border-radius: 6px;
+    border: 1px solid var(--card-border);
+    background: var(--card-bg);
+    color: var(--color);
+    font-size: 12px;
+    font-family: inherit;
+    padding: 0 6px;
+    outline: none;
+    cursor: pointer;
+    flex: 1;
+}
+
+.setting-select:focus,
+.setting-number:focus,
+.setting-date:focus { border-color: #cc0000; }
+
+.setting-unit {
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+}
+
 /* ── Buttons ── */
 .btn-group {
     display: flex;

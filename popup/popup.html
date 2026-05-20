@@ -57,6 +57,39 @@
         </div>
     </div>
 
+    <!-- Filter & Export -->
+    <div class="settings-wrap" id="settingsWrap">
+        <div class="settings-row">
+            <span class="settings-label">Videos</span>
+            <div class="radio-group">
+                <label class="radio-label"><input type="radio" name="filterMode" value="all"> All</label>
+                <label class="radio-label"><input type="radio" name="filterMode" value="count"> Count</label>
+                <label class="radio-label"><input type="radio" name="filterMode" value="date"> Date</label>
+            </div>
+        </div>
+        <div class="filter-sub" id="filterCountRow" style="display:none">
+            <select class="setting-select" id="filterDirection">
+                <option value="latest">Latest</option>
+                <option value="oldest">Oldest</option>
+            </select>
+            <input class="setting-number" type="number" id="filterCount" min="1" placeholder="10">
+            <span class="setting-unit">videos</span>
+        </div>
+        <div class="filter-sub" id="filterDateRow" style="display:none">
+            <input class="setting-date" type="date" id="filterFrom">
+            <span class="setting-unit">to</span>
+            <input class="setting-date" type="date" id="filterTo">
+        </div>
+        <div class="settings-divider"></div>
+        <div class="settings-row">
+            <span class="settings-label">Export</span>
+            <div class="radio-group">
+                <label class="radio-label"><input type="radio" name="exportFormat" value="csv"> CSV</label>
+                <label class="radio-label"><input type="radio" name="exportFormat" value="excel"> Excel</label>
+            </div>
+        </div>
+    </div>
+
     <!-- Buttons -->
     <div class="btn-group">
         <button class="btn btn-primary" id="startButton">
@@ -74,7 +107,7 @@
         <svg width="14" height="14" viewBox="0 0 24 24" class="footer-icon">
             <path d="M11 7h2v2h-2V7Zm0 4h2v6h-2v-6Zm1-9a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z" fill="currentColor"/>
         </svg>
-        <span id="footerText">Open Studio → Content to begin.</span>
+        <span id="footerText">Open Studio → Content to begin. <br> Only Published videos are scraped.</span>
     </div>
 
 </div>
