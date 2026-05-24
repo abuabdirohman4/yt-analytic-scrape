@@ -22,6 +22,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterCount = document.getElementById('filterCount');
     const filterFrom = document.getElementById('filterFrom');
     const filterTo = document.getElementById('filterTo');
+    const columnsAccordionHeader = document.getElementById('columnsAccordionHeader');
+    const columnsList = document.getElementById('columnsList');
+    const columnsSummary = document.getElementById('columnsSummary');
+    const columnsArrow = document.getElementById('columnsArrow');
+
+    const ALL_COLUMNS = [
+        'Title', 
+        'Description', 
+        'Upload Date', 
+        'Video Age (Day)', 
+        'Video Duration',
+        'Impressions', 
+        'Impressions First 2 Days', 
+        'CTR',
+        'Views', 
+        'Suggested + Browse', 
+        'Avg View Duration', 
+        'Avg % Viewed'
+    ];
 
     // ── Icons ──
     const ICONS = {
@@ -60,6 +79,40 @@ document.addEventListener('DOMContentLoaded', () => {
         radio.addEventListener('change', () => {
             chrome.storage.local.set({ exportFormat: radio.value });
         });
+    });
+
+    // ── Column toggles ──
+    function updateColumnsSummary(selected) {
+        columnsSummary.textContent = `${selected.length} selected`;
+    }
+
+    function saveSelectedColumns() {
+        const checked = [...columnsList.querySelectorAll('input:checked')].map(cb => cb.value);
+        chrome.storage.local.set({ selectedColumns: checked });
+        updateColumnsSummary(checked);
+    }
+
+    function renderColumnToggles(selected) {
+        columnsList.innerHTML = '';
+        ALL_COLUMNS.forEach(col => {
+            const label = document.createElement('label');
+            label.className = 'column-toggle-label';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = col;
+            cb.checked = selected.includes(col);
+            cb.addEventListener('change', saveSelectedColumns);
+            label.appendChild(cb);
+            label.appendChild(document.createTextNode(col));
+            columnsList.appendChild(label);
+        });
+        updateColumnsSummary(selected);
+    }
+
+    columnsAccordionHeader.addEventListener('click', () => {
+        const open = columnsList.style.display !== 'none';
+        columnsList.style.display = open ? 'none' : '';
+        columnsArrow.textContent = open ? '▼' : '▲';
     });
 
     // ── Theme ──
@@ -180,8 +233,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // ── Initial load — restore filter & export settings ──
-    chrome.storage.local.get(['scrapeFilter', 'exportFormat'], (r) => {
+    // ── Initial load — restore filter, export settings & column selection ──
+    chrome.storage.local.get(['scrapeFilter', 'exportFormat', 'selectedColumns'], (r) => {
         const filter = r.scrapeFilter || { mode: 'all' };
         const modeRadio = document.querySelector(`input[name="filterMode"][value="${filter.mode}"]`);
         if (modeRadio) modeRadio.checked = true;
@@ -197,6 +250,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const fmt = r.exportFormat || 'csv';
         const fmtRadio = document.querySelector(`input[name="exportFormat"][value="${fmt}"]`);
         if (fmtRadio) fmtRadio.checked = true;
+
+        const selected = r.selectedColumns || ALL_COLUMNS;
+        renderColumnToggles(selected);
     });
 
     // ── Initial load — restore state ──

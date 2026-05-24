@@ -2,6 +2,7 @@
 
 function getPageType() {
     const url = window.location.href;
+    if (url.includes('/edit') && !url.includes('/analytics')) return 'video-details';
     if (url.includes('/videos') && !url.includes('/analytics')) return 'channel-content';
     if (url.includes('/analytics/tab-reach') && (url.includes('time_period_unit_nth_days') || /period-\d+,\d+/.test(url))) return 'reach48h';
     if (url.includes('/analytics/tab-reach')) return 'reach';
@@ -110,6 +111,32 @@ function normalizeUploadDate(dateStr) {
     if (!dateStr) return '';
     if (/\d{4}/.test(dateStr)) return dateStr;
     return `${dateStr} ${new Date().getFullYear()}`;
+}
+
+// ===================== COLUMN → PHASE MAPPING =====================
+
+const ALL_COLUMN_KEYS = [
+    'Title', 'Description', 'Upload Date', 'Video Age (Day)', 'Video Duration',
+    'Impressions', 'Impressions First 2 Days', 'CTR', 'Views',
+    'Suggested + Browse', 'Avg View Duration', 'Avg % Viewed'
+];
+
+function buildScrapePhases(selectedColumns) {
+    const cols = selectedColumns || ALL_COLUMN_KEYS;
+    const phases = [];
+    if (cols.some(c => ['Avg View Duration', 'Avg % Viewed'].includes(c))) phases.push('overview');
+    if (cols.includes('Impressions First 2 Days')) phases.push('reach48h');
+    if (cols.some(c => ['Impressions', 'CTR', 'Views', 'Suggested + Browse'].includes(c))) phases.push('reach');
+    if (cols.includes('Description')) phases.push('video-details');
+    return phases;
+}
+
+function getPhaseUrl(videoId, phase) {
+    if (phase === 'overview')      return `https://studio.youtube.com/video/${videoId}/analytics/tab-overview/period-default`;
+    if (phase === 'reach48h')      return buildFirst2DaysUrl(videoId);
+    if (phase === 'reach')         return `https://studio.youtube.com/video/${videoId}/analytics/tab-reach_viewers/period-default`;
+    if (phase === 'video-details') return `https://studio.youtube.com/video/${videoId}/edit`;
+    return null;
 }
 
 // ===================== FILTER =====================
@@ -317,6 +344,27 @@ async function scrapeOverviewTab() {
     return { avgViewDuration: formatDuration(avgViewDuration), avgPctViewed };
 }
 
+async function scrapeVideoDetailsTab() {
+    console.log('[Content Script] Scraping Video Details (edit) tab...');
+    try {
+        await waitForUrlMatch(/\/edit(?:[?#]|$)/);
+    } catch (e) {
+        console.warn('[Content Script] Video details tab: URL did not match in time.');
+    }
+    try {
+        await waitForElement('ytcp-video-description');
+    } catch (e) {
+        console.warn('[Content Script] Video details tab: description element not found, skipping.');
+        return { description: '' };
+    }
+    await new Promise(r => setTimeout(r, 1500));
+    const el = document.querySelector('ytcp-video-description #textbox')
+            || document.querySelector('div[aria-label*="Tell viewers about your video"]');
+    const description = el ? el.innerText.trim() : '';
+    console.log('[Content Script] Video details data: description length =', description.length);
+    return { description };
+}
+
 // ===================== MAIN AUTOMATION =====================
 
 async function runScraping() {
@@ -338,7 +386,7 @@ async function runScraping() {
         return;
     }
 
-    const { scrapeFilter } = await chrome.storage.local.get(['scrapeFilter']);
+    const { scrapeFilter, selectedColumns } = await chrome.storage.local.get(['scrapeFilter', 'selectedColumns']);
     const videos = applyFilter(allVideos, scrapeFilter);
     if (videos.length === 0) {
         console.error('[Content Script] No videos match the current filter.');
@@ -347,13 +395,29 @@ async function runScraping() {
     }
     console.log(`[Content Script] Filter applied: ${videos.length}/${allVideos.length} videos will be scraped.`);
 
-    await chrome.storage.local.set({ scrapeQueue: videos, scrapedData: [], currentVideoIndex: 0, scrapePhase: 'overview', channelId });
+    const phases = buildScrapePhases(selectedColumns);
+    console.log(`[Content Script] Active phases:`, phases);
+
+    // No analytics phases needed — all data comes from the video list page
+    if (phases.length === 0) {
+        const scrapedData = videos.map(v => ({
+            videoId: v.videoId, title: v.title, uploadDate: v.uploadDate, videoDuration: v.videoDuration
+        }));
+        await chrome.storage.local.set({ scrapedData, channelId });
+        chrome.runtime.sendMessage({ action: 'scrapingJobDone' });
+        if (channelId) {
+            chrome.runtime.sendMessage({ action: 'navigateTo', url: `https://studio.youtube.com/channel/${channelId}/videos` });
+        }
+        return;
+    }
+
+    await chrome.storage.local.set({
+        scrapeQueue: videos, scrapedData: [], currentVideoIndex: 0,
+        scrapePhase: phases[0], scrapePhases: phases, channelId
+    });
 
     const firstVideo = videos[0];
-    chrome.runtime.sendMessage({
-        action: 'navigateTo',
-        url: `https://studio.youtube.com/video/${firstVideo.videoId}/analytics/tab-overview/period-default`
-    });
+    chrome.runtime.sendMessage({ action: 'navigateTo', url: getPhaseUrl(firstVideo.videoId, phases[0]) });
 }
 
 async function continueScrapingOnCurrentPage(state) {
@@ -383,88 +447,83 @@ async function continueScrapingOnCurrentPage(state) {
         videoTitle: video.title
     });
 
-    const navigateToNext = async (nextIndex) => {
-        if (nextIndex >= scrapeQueue.length) {
-            console.log('[Content Script] All videos scraped.');
-            chrome.runtime.sendMessage({ action: 'scrapingJobDone' });
-            if (channelId) {
-                chrome.runtime.sendMessage({
-                    action: 'navigateTo',
-                    url: `https://studio.youtube.com/channel/${channelId}/videos`
-                });
-            }
-        } else {
-            const nextVideo = scrapeQueue[nextIndex];
-            chrome.runtime.sendMessage({
-                action: 'navigateTo',
-                url: `https://studio.youtube.com/video/${nextVideo.videoId}/analytics/tab-overview/period-default`
-            });
-        }
+    // Scrape the current phase
+    const scrapePhase = async (phase) => {
+        if (phase === 'overview')      return scrapeOverviewTab();
+        if (phase === 'reach48h')      return scrapeReach48hTab();
+        if (phase === 'reach')         return scrapeReachTab();
+        if (phase === 'video-details') return scrapeVideoDetailsTab();
+        return null;
     };
 
     try {
-        if (pageType === 'overview') {
-            const overviewData = await scrapeOverviewTab();
-            const result = await chrome.storage.local.get(['scrapedData']);
-            const scrapedData = result.scrapedData || [];
+        const { scrapedData: prevData, scrapePhases } = await chrome.storage.local.get(['scrapedData', 'scrapePhases']);
+        const phases = scrapePhases || [];
+        const scrapedData = prevData || [];
+
+        // Seed record on first phase for this video
+        if (!scrapedData[currentVideoIndex]) {
             scrapedData[currentVideoIndex] = {
                 videoId: video.videoId,
                 title: video.title,
                 uploadDate: video.uploadDate,
-                videoDuration: video.videoDuration,
-                ...(overviewData || {})
+                videoDuration: video.videoDuration
             };
-            await chrome.storage.local.set({ scrapedData, scrapePhase: 'reach48h' });
-
-            const url48h = buildFirst2DaysUrl(video.videoId);
-            if (url48h) {
-                chrome.runtime.sendMessage({ action: 'navigateTo', url: url48h });
-            } else {
-                // No valid date — skip reach48h, go straight to reach
-                await chrome.storage.local.set({ scrapePhase: 'reach' });
-                chrome.runtime.sendMessage({
-                    action: 'navigateTo',
-                    url: `https://studio.youtube.com/video/${video.videoId}/analytics/tab-reach_viewers/period-default`
-                });
-            }
-
-        } else if (pageType === 'reach48h') {
-            const reach48hData = await scrapeReach48hTab();
-            const result = await chrome.storage.local.get(['scrapedData']);
-            const scrapedData = result.scrapedData || [];
-            if (scrapedData[currentVideoIndex]) {
-                scrapedData[currentVideoIndex] = { ...scrapedData[currentVideoIndex], ...(reach48hData || {}) };
-            }
-            await chrome.storage.local.set({ scrapedData, scrapePhase: 'reach' });
-
-            chrome.runtime.sendMessage({
-                action: 'navigateTo',
-                url: `https://studio.youtube.com/video/${video.videoId}/analytics/tab-reach_viewers/period-default`
-            });
-
-        } else if (pageType === 'reach') {
-            const reachData = await scrapeReachTab();
-            const result = await chrome.storage.local.get(['scrapedData']);
-            const scrapedData = result.scrapedData || [];
-            if (scrapedData[currentVideoIndex]) {
-                scrapedData[currentVideoIndex] = { ...scrapedData[currentVideoIndex], ...(reachData || {}) };
-            }
-
-            const nextIndex = currentVideoIndex + 1;
-            await chrome.storage.local.set({ scrapedData, currentVideoIndex: nextIndex, scrapePhase: 'overview' });
-            await navigateToNext(nextIndex);
-
-        } else {
-            console.warn('[Content Script] Unexpected page type during continue:', pageType);
-            chrome.runtime.sendMessage({ action: 'scrapingJobDone' });
         }
+
+        const phaseData = await scrapePhase(pageType);
+        if (phaseData) {
+            scrapedData[currentVideoIndex] = { ...scrapedData[currentVideoIndex], ...phaseData };
+        }
+
+        const navigateToNext = async (nextIndex) => {
+            if (nextIndex >= scrapeQueue.length) {
+                console.log('[Content Script] All videos scraped.');
+                chrome.runtime.sendMessage({ action: 'scrapingJobDone' });
+                if (channelId) {
+                    chrome.runtime.sendMessage({
+                        action: 'navigateTo',
+                        url: `https://studio.youtube.com/channel/${channelId}/videos`
+                    });
+                }
+            } else {
+                const nextVideo = scrapeQueue[nextIndex];
+                chrome.runtime.sendMessage({ action: 'navigateTo', url: getPhaseUrl(nextVideo.videoId, phases[0]) });
+            }
+        };
+
+        const currentPhaseIdx = phases.indexOf(pageType);
+        const nextPhase = phases[currentPhaseIdx + 1];
+
+        if (nextPhase) {
+            await chrome.storage.local.set({ scrapedData, scrapePhase: nextPhase });
+            chrome.runtime.sendMessage({ action: 'navigateTo', url: getPhaseUrl(video.videoId, nextPhase) });
+        } else {
+            const nextIndex = currentVideoIndex + 1;
+            await chrome.storage.local.set({ scrapedData, currentVideoIndex: nextIndex, scrapePhase: phases[0] || 'done' });
+            await navigateToNext(nextIndex);
+        }
+
     } catch (err) {
         console.error('[Content Script] Error during scraping:', err);
+        const { scrapedData: prevData, scrapePhases } = await chrome.storage.local.get(['scrapedData', 'scrapePhases']);
+        const phases = scrapePhases || [];
         const nextIndex = currentVideoIndex + 1;
-        const result = await chrome.storage.local.get(['scrapedData']);
-        const scrapedData = result.scrapedData || [];
-        await chrome.storage.local.set({ scrapedData, currentVideoIndex: nextIndex, scrapePhase: 'overview' });
-        await navigateToNext(nextIndex);
+        await chrome.storage.local.set({
+            scrapedData: prevData || [],
+            currentVideoIndex: nextIndex,
+            scrapePhase: phases[0] || 'done'
+        });
+        // Inline navigateToNext for error recovery
+        if (nextIndex >= scrapeQueue.length) {
+            chrome.runtime.sendMessage({ action: 'scrapingJobDone' });
+            if (channelId) {
+                chrome.runtime.sendMessage({ action: 'navigateTo', url: `https://studio.youtube.com/channel/${channelId}/videos` });
+            }
+        } else {
+            const nextVideo = scrapeQueue[nextIndex];
+            chrome.runtime.sendMessage({ action: 'navigateTo', url: getPhaseUrl(nextVideo.videoId, phases[0]) });
+        }
     }
 }
 
@@ -492,7 +551,7 @@ if (!window.ytScraperLoaded) {
     // Auto-continue when navigated to an analytics page mid-scrape
     chrome.storage.local.get(['isScraping', 'scrapePhase', 'scrapeQueue', 'currentVideoIndex', 'channelId'], (state) => {
         const pageType = getPageType();
-        if (state.isScraping && (pageType === 'overview' || pageType === 'reach48h' || pageType === 'reach')) {
+        if (state.isScraping && (pageType === 'overview' || pageType === 'reach48h' || pageType === 'reach' || pageType === 'video-details')) {
             console.log('[Content Script] Resuming scraping on page load. Phase:', pageType);
             continueScrapingOnCurrentPage(state);
         }

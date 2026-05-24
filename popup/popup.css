@@ -376,6 +376,56 @@ body {
     white-space: nowrap;
 }
 
+/* ── Column accordion ── */
+.settings-accordion-header {
+    cursor: pointer;
+    user-select: none;
+}
+
+.settings-accordion-header:hover .settings-label,
+.settings-accordion-header:hover .accordion-summary,
+.settings-accordion-header:hover .accordion-arrow {
+    color: var(--color);
+}
+
+.accordion-summary {
+    flex: 1;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+    padding-right: 4px;
+}
+
+.accordion-arrow {
+    font-size: 10px;
+    color: var(--muted);
+    flex-shrink: 0;
+}
+
+.columns-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 8px;
+    padding: 4px 0 4px 50px;
+}
+
+.column-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--color);
+    cursor: pointer;
+    padding: 2px 0;
+    white-space: nowrap;
+}
+
+.column-toggle-label input[type="checkbox"] {
+    accent-color: #cc0000;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
 /* ── Buttons ── */
 .btn-group {
     display: flex;

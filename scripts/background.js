@@ -65,11 +65,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     else if (request.action === 'updateProgress') {
         const { currentVideo, totalVideos, phase } = request;
-        chrome.storage.local.get(['videoFinishTimes'], (r) => {
+        chrome.storage.local.get(['videoFinishTimes', 'scrapePhases'], (r) => {
             const times = r.videoFinishTimes || [];
+            const lastPhase = (r.scrapePhases || ['reach']).at(-1);
 
-            // Record timestamp only when a video is fully done (reach = last phase per video)
-            if (phase === 'reach') {
+            // Record timestamp only when a video completes its last active phase
+            if (phase === lastPhase) {
                 times.push(Date.now());
                 chrome.storage.local.set({ videoFinishTimes: times });
             }
@@ -96,15 +97,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         console.log('[Background] Scraping done. Generating export.');
         setScrapingState(false, 'Done!');
         chrome.storage.local.set({ lastProgress: null });
-        chrome.storage.local.get(['scrapedData', 'exportFormat', 'scrapingTabId'], (result) => {
+        chrome.storage.local.get(['scrapedData', 'exportFormat', 'selectedColumns'], (result) => {
             const data = result.scrapedData || [];
             const format = result.exportFormat || 'csv';
+            const selectedCols = result.selectedColumns || HEADERS;
+            const activeHeaders = HEADERS.filter(h => selectedCols.includes(h));
             if (data.length === 0) {
                 sendResponse({ success: false });
                 return;
             }
             if (format === 'excel') {
-                const xml = generateExcel(data);
+                const xml = generateExcel(data, activeHeaders);
                 const dataUrl = 'data:application/vnd.ms-excel;charset=utf-8,' + encodeURIComponent(xml);
                 const filename = `yt-analytics_${Date.now()}.xls`;
                 chrome.downloads.download({ url: dataUrl, filename, saveAs: false }, () => {
@@ -113,7 +116,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     }
                 });
             } else {
-                const csv = generateCSV(data);
+                const csv = generateCSV(data, activeHeaders);
                 const dataUrl = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
                 const filename = `yt-analytics_${Date.now()}.csv`;
                 chrome.downloads.download({ url: dataUrl, filename, saveAs: false }, () => {
@@ -140,19 +143,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 const HEADERS = [
+    'Title',
+    'Description',
     'Upload Date',
     'Video Age (Day)',
+    'Video Duration',
     'Impressions',
     'Impressions First 2 Days',
     'CTR',
     'Views',
     'Suggested + Browse',
-    'Video Duration',
     'Avg View Duration',
     'Avg % Viewed'
 ];
 
 const KEY_MAP = {
+    'Title': 'title',
     'Upload Date': 'uploadDate',
     'Impressions': 'impressions',
     'Impressions First 2 Days': 'impressions48h',
@@ -161,7 +167,8 @@ const KEY_MAP = {
     'Suggested + Browse': 'suggestedPlusBrowse',
     'Video Duration': 'videoDuration',
     'Avg View Duration': 'avgViewDuration',
-    'Avg % Viewed': 'avgPctViewed'
+    'Avg % Viewed': 'avgPctViewed',
+    'Description': 'description'
 };
 
 const calcAgeDays = (uploadDateStr) => {
@@ -176,7 +183,7 @@ const getRowValue = (row, h) => {
     return row[KEY_MAP[h]] ?? '';
 };
 
-function generateCSV(data) {
+function generateCSV(data, headers = HEADERS) {
     const escapeCSV = (val) => {
         if (val == null) return '';
         const str = String(val);
@@ -186,19 +193,19 @@ function generateCSV(data) {
         return str;
     };
 
-    const rows = data.map(row => HEADERS.map(h => escapeCSV(getRowValue(row, h))).join(','));
-    return [HEADERS.join(','), ...rows].join('\n');
+    const rows = data.map(row => headers.map(h => escapeCSV(getRowValue(row, h))).join(','));
+    return [headers.join(','), ...rows].join('\n');
 }
 
-function generateExcel(data) {
+function generateExcel(data, headers = HEADERS) {
     const escapeXml = (val) => {
         if (val == null) return '';
         return String(val).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     };
 
-    const headerRow = HEADERS.map(h => `<Cell><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`).join('');
+    const headerRow = headers.map(h => `<Cell><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`).join('');
     const dataRows = data.map(row => {
-        const cells = HEADERS.map(h => {
+        const cells = headers.map(h => {
             const val = getRowValue(row, h);
             const isNum = val !== '' && !isNaN(Number(String(val).replace('%', ''))) && !String(val).endsWith('%');
             const type = isNum ? 'Number' : 'String';
@@ -230,6 +237,8 @@ chrome.runtime.onInstalled.addListener(() => {
         videoFinishTimes: [],
         lastProgress: null,
         scrapeFilter: { mode: 'all' },
-        exportFormat: 'csv'
+        exportFormat: 'csv',
+        selectedColumns: HEADERS,
+        scrapePhases: []
     });
 });
