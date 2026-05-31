@@ -376,6 +376,14 @@ body {
     white-space: nowrap;
 }
 
+/* ── Description warning ── */
+.description-warning {
+    font-size: 11px;
+    color: #f59e0b;
+    padding: 4px 0 2px 50px;
+    line-height: 1.4;
+}
+
 /* ── Column accordion ── */
 .settings-accordion-header {
     cursor: pointer;

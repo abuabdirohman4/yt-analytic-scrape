@@ -26,19 +26,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const columnsList = document.getElementById('columnsList');
     const columnsSummary = document.getElementById('columnsSummary');
     const columnsArrow = document.getElementById('columnsArrow');
+    const descriptionWarning = document.getElementById('descriptionWarning');
 
     const ALL_COLUMNS = [
-        'Title', 
-        'Description', 
-        'Upload Date', 
-        'Video Age (Day)', 
-        'Video Duration',
-        'Impressions', 
-        'Impressions First 2 Days', 
+        'Title',
+        'Description',
+        'Upload Date',
+        'Video Age (Day)',
+        'Impressions',
+        'Impressions First 2 Days',
         'CTR',
-        'Views', 
-        'Suggested + Browse', 
-        'Avg View Duration', 
+        'Views',
+        'Suggested + Browse',
+        'Video Duration',
+        'Avg View Duration',
         'Avg % Viewed'
     ];
 
@@ -86,10 +87,15 @@ document.addEventListener('DOMContentLoaded', () => {
         columnsSummary.textContent = `${selected.length} selected`;
     }
 
+    function updateDescriptionWarning(selected) {
+        descriptionWarning.style.display = selected.includes('Description') ? '' : 'none';
+    }
+
     function saveSelectedColumns() {
         const checked = [...columnsList.querySelectorAll('input:checked')].map(cb => cb.value);
         chrome.storage.local.set({ selectedColumns: checked });
         updateColumnsSummary(checked);
+        updateDescriptionWarning(checked);
     }
 
     function renderColumnToggles(selected) {
@@ -107,6 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
             columnsList.appendChild(label);
         });
         updateColumnsSummary(selected);
+        updateDescriptionWarning(selected);
     }
 
     columnsAccordionHeader.addEventListener('click', () => {
@@ -251,7 +258,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const fmtRadio = document.querySelector(`input[name="exportFormat"][value="${fmt}"]`);
         if (fmtRadio) fmtRadio.checked = true;
 
-        const selected = r.selectedColumns || ALL_COLUMNS;
+        const DEFAULT_COLUMNS = ALL_COLUMNS.filter(c => c !== 'Title' && c !== 'Description');
+        const selected = r.selectedColumns || DEFAULT_COLUMNS;
         renderColumnToggles(selected);
     });
 

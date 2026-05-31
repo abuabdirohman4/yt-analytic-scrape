@@ -46,15 +46,26 @@ function waitForElement(selector, timeout = 15000) {
 }
 
 function getMetricByLabel(labelText) {
+    const needle = labelText.toLowerCase();
     const blocks = document.querySelectorAll('yta-key-metric-block');
     for (const block of blocks) {
         const labelEl = block.querySelector('#metric-label');
-        if (labelEl && labelEl.textContent.trim().includes(labelText)) {
+        if (labelEl && labelEl.textContent.trim().toLowerCase().includes(needle)) {
             const container = block.querySelector('#metric-and-performance-container');
             if (!container) continue;
             const spans = container.querySelectorAll('span');
             if (spans.length > 0) return spans[0].textContent.trim();
             return container.textContent.trim().split('\n')[0].trim();
+        }
+    }
+    // Fallback: broader selector sweep for alternate DOM structures
+    const allLabels = document.querySelectorAll('[id="metric-label"], .metric-label, yta-key-metric-block #title');
+    for (const labelEl of allLabels) {
+        if (labelEl.textContent.trim().toLowerCase().includes(needle)) {
+            const block = labelEl.closest('yta-key-metric-block');
+            if (!block) continue;
+            const val = block.querySelector('#metric-value, .metric-value, [id="metric-and-performance-container"] span');
+            if (val) return val.textContent.trim();
         }
     }
     return null;
@@ -116,9 +127,9 @@ function normalizeUploadDate(dateStr) {
 // ===================== COLUMN → PHASE MAPPING =====================
 
 const ALL_COLUMN_KEYS = [
-    'Title', 'Description', 'Upload Date', 'Video Age (Day)', 'Video Duration',
+    'Title', 'Description', 'Upload Date', 'Video Age (Day)',
     'Impressions', 'Impressions First 2 Days', 'CTR', 'Views',
-    'Suggested + Browse', 'Avg View Duration', 'Avg % Viewed'
+    'Suggested + Browse', 'Video Duration', 'Avg View Duration', 'Avg % Viewed'
 ];
 
 function buildScrapePhases(selectedColumns) {
@@ -126,7 +137,7 @@ function buildScrapePhases(selectedColumns) {
     const phases = [];
     if (cols.some(c => ['Avg View Duration', 'Avg % Viewed'].includes(c))) phases.push('overview');
     if (cols.includes('Impressions First 2 Days')) phases.push('reach48h');
-    if (cols.some(c => ['Impressions', 'CTR', 'Views', 'Suggested + Browse'].includes(c))) phases.push('reach');
+    if (cols.some(c => ['Impressions', 'CTR', 'Suggested + Browse'].includes(c))) phases.push('reach');
     if (cols.includes('Description')) phases.push('video-details');
     return phases;
 }
@@ -206,7 +217,12 @@ async function getVideoListFromPage() {
         const durationEl = row.querySelector('ytcp-thumbnail .label');
         const videoDuration = formatDuration(durationEl ? durationEl.textContent.trim() : '');
 
-        videos.push({ videoId, title, uploadDate, videoDuration });
+        // Views from channel-content page — more reliable than reach tab for new videos
+        const viewsEl = row.querySelector('.tablecell-views');
+        const rawViews = viewsEl ? viewsEl.textContent.trim() : '';
+        const views = rawViews ? parseNumber(rawViews.replace(/,/g, '')) : '';
+
+        videos.push({ videoId, title, uploadDate, videoDuration, views });
     });
 
     // Sort oldest to newest
@@ -257,7 +273,6 @@ async function scrapeReachTab() {
 
     const impressions = parseNumber(getMetricByLabel('Impressions'));
     const ctr = getMetricByLabel('click-through rate');
-    const views = parseNumber(getMetricByLabel('Views'));
 
     let suggestedVideos = null;
     let browseFeatures = null;
@@ -295,8 +310,8 @@ async function scrapeReachTab() {
         ? (sP + bP).toFixed(1) + '%'
         : (sP !== null ? suggestedVideos : (bP !== null ? browseFeatures : null));
 
-    console.log('[Content Script] Reach data:', { impressions, ctr, views, suggestedPlusBrowse });
-    return { impressions, ctr, views, suggestedPlusBrowse };
+    console.log('[Content Script] Reach data:', { impressions, ctr, suggestedPlusBrowse });
+    return { impressions, ctr, suggestedPlusBrowse };
 }
 
 async function scrapeOverviewTab() {
@@ -401,7 +416,7 @@ async function runScraping() {
     // No analytics phases needed — all data comes from the video list page
     if (phases.length === 0) {
         const scrapedData = videos.map(v => ({
-            videoId: v.videoId, title: v.title, uploadDate: v.uploadDate, videoDuration: v.videoDuration
+            videoId: v.videoId, title: v.title, uploadDate: v.uploadDate, videoDuration: v.videoDuration, views: v.views
         }));
         await chrome.storage.local.set({ scrapedData, channelId });
         chrome.runtime.sendMessage({ action: 'scrapingJobDone' });
@@ -467,13 +482,18 @@ async function continueScrapingOnCurrentPage(state) {
                 videoId: video.videoId,
                 title: video.title,
                 uploadDate: video.uploadDate,
-                videoDuration: video.videoDuration
+                videoDuration: video.videoDuration,
+                views: video.views
             };
         }
 
         const phaseData = await scrapePhase(pageType);
         if (phaseData) {
-            scrapedData[currentVideoIndex] = { ...scrapedData[currentVideoIndex], ...phaseData };
+            for (const [k, v] of Object.entries(phaseData)) {
+                if (v !== '' && v !== null && v !== undefined) {
+                    scrapedData[currentVideoIndex][k] = v;
+                }
+            }
         }
 
         const navigateToNext = async (nextIndex) => {

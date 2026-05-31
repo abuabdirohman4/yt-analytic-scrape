@@ -147,12 +147,12 @@ const HEADERS = [
     'Description',
     'Upload Date',
     'Video Age (Day)',
-    'Video Duration',
     'Impressions',
     'Impressions First 2 Days',
     'CTR',
     'Views',
     'Suggested + Browse',
+    'Video Duration',
     'Avg View Duration',
     'Avg % Viewed'
 ];
@@ -238,7 +238,7 @@ chrome.runtime.onInstalled.addListener(() => {
         lastProgress: null,
         scrapeFilter: { mode: 'all' },
         exportFormat: 'csv',
-        selectedColumns: HEADERS,
+        selectedColumns: HEADERS.filter(h => h !== 'Title' && h !== 'Description'),
         scrapePhases: []
     });
 });
