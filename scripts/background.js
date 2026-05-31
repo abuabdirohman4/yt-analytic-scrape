@@ -154,7 +154,11 @@ const HEADERS = [
     'Suggested + Browse',
     'Video Duration',
     'Avg View Duration',
-    'Avg % Viewed'
+    'Avg % Viewed',
+    'Subscribers',
+    'Realtime',
+    'Likes',
+    'Comments'
 ];
 
 const KEY_MAP = {
@@ -168,7 +172,11 @@ const KEY_MAP = {
     'Video Duration': 'videoDuration',
     'Avg View Duration': 'avgViewDuration',
     'Avg % Viewed': 'avgPctViewed',
-    'Description': 'description'
+    'Description': 'description',
+    'Subscribers': 'subscribersGained',
+    'Realtime': 'realtimeViewers',
+    'Likes': 'likes',
+    'Comments': 'comments'
 };
 
 const calcAgeDays = (uploadDateStr) => {
@@ -238,7 +246,7 @@ chrome.runtime.onInstalled.addListener(() => {
         lastProgress: null,
         scrapeFilter: { mode: 'all' },
         exportFormat: 'csv',
-        selectedColumns: HEADERS.filter(h => h !== 'Title' && h !== 'Description'),
+        selectedColumns: HEADERS.filter(h => !['Title', 'Description', 'Subscribers', 'Realtime', 'Likes', 'Comments'].includes(h)),
         scrapePhases: []
     });
 });

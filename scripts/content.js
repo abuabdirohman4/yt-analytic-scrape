@@ -129,13 +129,14 @@ function normalizeUploadDate(dateStr) {
 const ALL_COLUMN_KEYS = [
     'Title', 'Description', 'Upload Date', 'Video Age (Day)',
     'Impressions', 'Impressions First 2 Days', 'CTR', 'Views',
-    'Suggested + Browse', 'Video Duration', 'Avg View Duration', 'Avg % Viewed'
+    'Suggested + Browse', 'Video Duration', 'Avg View Duration', 'Avg % Viewed',
+    'Subscribers', 'Realtime', 'Likes', 'Comments'
 ];
 
 function buildScrapePhases(selectedColumns) {
     const cols = selectedColumns || ALL_COLUMN_KEYS;
     const phases = [];
-    if (cols.some(c => ['Avg View Duration', 'Avg % Viewed'].includes(c))) phases.push('overview');
+    if (cols.some(c => ['Avg View Duration', 'Avg % Viewed', 'Subscribers', 'Realtime'].includes(c))) phases.push('overview');
     if (cols.includes('Impressions First 2 Days')) phases.push('reach48h');
     if (cols.some(c => ['Impressions', 'CTR', 'Suggested + Browse'].includes(c))) phases.push('reach');
     if (cols.includes('Description')) phases.push('video-details');
@@ -222,7 +223,18 @@ async function getVideoListFromPage() {
         const rawViews = viewsEl ? viewsEl.textContent.trim() : '';
         const views = rawViews ? parseNumber(rawViews.replace(/,/g, '')) : '';
 
-        videos.push({ videoId, title, uploadDate, videoDuration, views });
+        // Likes from channel-content page — ".likes-label" contains "N like(s)" text
+        const likesEl = row.querySelector('.tablecell-likes .likes-label');
+        const rawLikes = likesEl ? likesEl.textContent.trim() : '';
+        const likesMatch = rawLikes.match(/^([\d,]+)\s+likes?$/i);
+        const likes = likesMatch ? parseInt(likesMatch[1].replace(/,/g, ''), 10) : 0;
+
+        // Comments from channel-content page
+        const commentsEl = row.querySelector('.tablecell-comments .comments-link');
+        const rawComments = commentsEl ? commentsEl.textContent.trim() : '';
+        const comments = rawComments ? parseNumber(rawComments.replace(/,/g, '')) : '';
+
+        videos.push({ videoId, title, uploadDate, videoDuration, views, likes, comments });
     });
 
     // Sort oldest to newest
@@ -355,8 +367,28 @@ async function scrapeOverviewTab() {
     //     }
     // });
 
-    console.log('[Content Script] Overview data:', { avgViewDuration, avgPctViewed });
-    return { avgViewDuration: formatDuration(avgViewDuration), avgPctViewed };
+    // Subscribers gained — yta-key-metric-block with label "Subscribers", value in #metric-total
+    let subscribersGained = null;
+    const metricBlocks = document.querySelectorAll('yta-key-metric-block');
+    for (const block of metricBlocks) {
+        const labelEl = block.querySelector('#metric-label');
+        if (labelEl && labelEl.textContent.trim().toLowerCase().includes('subscriber')) {
+            const totalEl = block.querySelector('#metric-total');
+            if (totalEl) {
+                const raw = totalEl.textContent.trim().replace(/^[+]/, '').replace(/,/g, '');
+                subscribersGained = /^[\d.]+[km]?$/i.test(raw) ? parseNumber(raw) : 0;
+                break;
+            }
+        }
+    }
+
+    // Realtime viewers — .metric-value inside yta-latest-activity-card (next to pulsating dot)
+    let realtimeViewers = null;
+    const realtimeEl = document.querySelector('yta-latest-activity-card .metric-value');
+    if (realtimeEl) realtimeViewers = parseNumber(realtimeEl.textContent.trim().replace(/,/g, ''));
+
+    console.log('[Content Script] Overview data:', { avgViewDuration, avgPctViewed, subscribersGained, realtimeViewers });
+    return { avgViewDuration: formatDuration(avgViewDuration), avgPctViewed, subscribersGained, realtimeViewers };
 }
 
 async function scrapeVideoDetailsTab() {
@@ -416,7 +448,8 @@ async function runScraping() {
     // No analytics phases needed — all data comes from the video list page
     if (phases.length === 0) {
         const scrapedData = videos.map(v => ({
-            videoId: v.videoId, title: v.title, uploadDate: v.uploadDate, videoDuration: v.videoDuration, views: v.views
+            videoId: v.videoId, title: v.title, uploadDate: v.uploadDate, videoDuration: v.videoDuration,
+            views: v.views, likes: v.likes, comments: v.comments
         }));
         await chrome.storage.local.set({ scrapedData, channelId });
         chrome.runtime.sendMessage({ action: 'scrapingJobDone' });
@@ -483,7 +516,9 @@ async function continueScrapingOnCurrentPage(state) {
                 title: video.title,
                 uploadDate: video.uploadDate,
                 videoDuration: video.videoDuration,
-                views: video.views
+                views: video.views,
+                likes: video.likes,
+                comments: video.comments
             };
         }
 

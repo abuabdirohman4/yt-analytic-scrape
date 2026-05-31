@@ -40,7 +40,11 @@ document.addEventListener('DOMContentLoaded', () => {
         'Suggested + Browse',
         'Video Duration',
         'Avg View Duration',
-        'Avg % Viewed'
+        'Avg % Viewed',
+        'Subscribers',
+        'Realtime',
+        'Likes',
+        'Comments'
     ];
 
     // ── Icons ──
@@ -258,7 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const fmtRadio = document.querySelector(`input[name="exportFormat"][value="${fmt}"]`);
         if (fmtRadio) fmtRadio.checked = true;
 
-        const DEFAULT_COLUMNS = ALL_COLUMNS.filter(c => c !== 'Title' && c !== 'Description');
+        const DEFAULT_COLUMNS = ALL_COLUMNS.filter(c => !['Title', 'Description', 'Subscribers', 'Realtime', 'Likes', 'Comments'].includes(c));
         const selected = r.selectedColumns || DEFAULT_COLUMNS;
         renderColumnToggles(selected);
     });
