@@ -8,6 +8,7 @@ A Chrome extension that automatically scrapes YouTube Studio analytics for all y
 - **Impressions First 2 Days** — captures the exact "First 2 days" impression count shown in YouTube Studio tooltips
 - **Column selection** — choose which columns to include in the export; scraping skips unnecessary analytics tabs automatically
 - **Description scraping** — optional column that captures each video's full description text
+- **Engagement metrics** — optional columns for Likes, Comments, Subscribers gained, and Realtime viewers per video
 - **CSV & Excel export** — download as `.csv` (Google Sheets / Excel) or `.xls` (opens directly in Excel with formatting)
 - **Video filter** — scrape all videos, the latest/oldest N, or a custom date range
 - **Live progress** — shows current video, phase, and ETA during scraping
@@ -29,6 +30,10 @@ A Chrome extension that automatically scrapes YouTube Studio analytics for all y
 | Video Duration | Length of the video |
 | Avg View Duration | Average time viewers watched |
 | Avg % Viewed | Average percentage of video watched |
+| Likes | Total likes (optional, from Content page) |
+| Comments | Total comment count (optional, from Content page) |
+| Subscribers | Subscribers gained attributed to the video (optional) |
+| Realtime | Current realtime viewer count at time of scraping (optional) |
 
 ## Installation
 

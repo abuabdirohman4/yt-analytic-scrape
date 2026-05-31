@@ -1,3 +1,10 @@
+## [1.2.0] — 2026-05-31
+
+### Added
+- **Likes & Comments**: Scraped directly from the Content page — no extra tab navigation required. Videos with no likes default to 0.
+- **Subscribers**: Subscribers gained per video from the overview analytics tab. Stored as a plain number (no "+" prefix) for spreadsheet compatibility.
+- **Realtime Viewers**: Current realtime viewer count per video from the overview tab.
+
 ## [1.1.0] — 2026-05-31
 
 ### Added

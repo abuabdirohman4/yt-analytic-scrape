@@ -10,7 +10,7 @@
 3. Click **Start scraping**
 
 **Data collected per video:**
-- Title
+- Title (optional)
 - Description (optional)
 - Upload Date
 - Video Age (days)
@@ -22,6 +22,10 @@
 - Video Duration
 - Avg View Duration
 - Avg % Viewed
+- Likes (optional)
+- Comments (optional)
+- Subscribers (optional)
+- Realtime Viewers (optional)
 
 **Notes:**
 - Only Published videos are scraped. Scheduled, Draft, and Private videos are skipped.
@@ -103,3 +107,23 @@
 **Notes:**
 - Description is read from the Studio edit page (`/edit`) for each video.
 - Use Excel (`.xls`) export when Description is selected for best compatibility.
+
+---
+
+## Engagement Metrics (Likes, Comments, Subscribers, Realtime)
+
+> Optional columns capturing per-video engagement data — all off by default.
+
+**How to use:**
+1. In the **Columns** panel, check any of: **Likes**, **Comments**, **Subscribers**, **Realtime**
+2. Click **Start scraping**
+
+**Column details:**
+- **Likes** — total likes on the video. Scraped from the Content page (no extra navigation). Videos with no likes show `0`.
+- **Comments** — total comment count. Scraped from the Content page.
+- **Subscribers** — subscribers gained attributed to the video, from the overview analytics tab. Stored as a plain number (e.g. `23`, not `+23`) for spreadsheet SUM compatibility.
+- **Realtime** — current realtime viewer count from the overview tab at the moment of scraping.
+
+**Notes:**
+- Likes and Comments require no extra tab navigation — scraped alongside Views from the Content page.
+- Subscribers and Realtime trigger the overview tab phase if not already active.
