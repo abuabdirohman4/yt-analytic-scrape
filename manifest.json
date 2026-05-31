@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YT Studio Analytics Scraper",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Automates scraping of YouTube Studio analytics data and exports to CSV.",
   "permissions": [
     "storage",

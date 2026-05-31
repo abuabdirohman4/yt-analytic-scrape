@@ -10,6 +10,8 @@
 3. Click **Start scraping**
 
 **Data collected per video:**
+- Title
+- Description (optional)
 - Upload Date
 - Video Age (days)
 - Impressions
@@ -70,3 +72,34 @@
 **How to use:**
 - Click the ☀ / 🌙 button in the top-right corner of the popup.
 - Theme preference is saved automatically.
+
+---
+
+## Column Selection
+
+> Choose exactly which columns appear in the exported file — skip what you don't need.
+
+**How to use:**
+1. In the popup, click **Columns** to expand the accordion panel
+2. Check or uncheck columns as needed
+3. Click **Start scraping** — only the selected columns are scraped and exported
+
+**Notes:**
+- Default selection includes all columns except Title and Description.
+- Selecting only channel-level columns (Title, Upload Date, Duration) skips all analytics tab navigation and completes instantly.
+- Column selection persists across popup sessions.
+
+---
+
+## Description Scraping
+
+> Capture each video's description text as an additional export column.
+
+**How to use:**
+1. In the **Columns** panel, check **Description**
+2. A warning appears recommending Excel format — descriptions may contain line breaks that break CSV parsing
+3. Click **Start scraping**
+
+**Notes:**
+- Description is read from the Studio edit page (`/edit`) for each video.
+- Use Excel (`.xls`) export when Description is selected for best compatibility.

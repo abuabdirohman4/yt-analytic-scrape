@@ -1,3 +1,14 @@
+## [1.1.0] — 2026-05-31
+
+### Added
+- **Column Selection**: Choose which columns to include in the export via an accordion panel in the popup. Defaults to all columns except Title and Description. Settings persist across sessions.
+- **Description Scraping**: New optional column that captures each video's description from the Studio edit page (`/edit`). A warning is shown in the popup when Description is selected, recommending Excel format to handle line breaks.
+- **Views from Content Page**: Views are now captured directly from the video list page, more reliable for newly published videos that haven't accumulated data on the reach tab yet.
+
+### Improved
+- **Dynamic Phase Skipping**: Scraping only visits analytics tabs needed for the selected columns. Selecting only channel-level columns (Title, Upload Date, Duration) completes instantly with no tab navigation.
+- **Metric Label Matching**: Fallback selector sweep added for alternate YouTube Studio DOM structures — reduces failed metric reads.
+
 ## [1.0.0] — 2026-05-20
 
 ### Added

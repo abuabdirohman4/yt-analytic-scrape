@@ -6,6 +6,8 @@ A Chrome extension that automatically scrapes YouTube Studio analytics for all y
 
 - **Analytics scraping** — collects impressions, CTR, views, traffic sources, view duration, and more for every published video
 - **Impressions First 2 Days** — captures the exact "First 2 days" impression count shown in YouTube Studio tooltips
+- **Column selection** — choose which columns to include in the export; scraping skips unnecessary analytics tabs automatically
+- **Description scraping** — optional column that captures each video's full description text
 - **CSV & Excel export** — download as `.csv` (Google Sheets / Excel) or `.xls` (opens directly in Excel with formatting)
 - **Video filter** — scrape all videos, the latest/oldest N, or a custom date range
 - **Live progress** — shows current video, phase, and ETA during scraping
@@ -15,6 +17,8 @@ A Chrome extension that automatically scrapes YouTube Studio analytics for all y
 
 | Column | Description |
 |---|---|
+| Title | Video title |
+| Description | Full video description (optional, from Studio edit page) |
 | Upload Date | Date the video was published |
 | Video Age (Day) | Days since upload |
 | Impressions | Total impressions (default period) |
